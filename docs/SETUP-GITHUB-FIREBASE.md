@@ -64,21 +64,17 @@ gh secret set FIREBASE_TOKEN
 
 실행 후 토큰을 붙여넣고 Enter 합니다.
 
-### 4-3. (Vite 전환 후) Firebase 웹 설정 Secrets
+### 4-3. Firebase 웹 설정 (Vite)
 
-앱을 Vite로 바꾼 뒤에는 Actions에 아래도 넣습니다.  
-값은 Firebase Console → 프로젝트 설정 → 일반 → 내 앱 → SDK 설정에서 확인합니다.
+빌드용 공개 설정은 저장소의 `.env.production`에 들어 있어, GitHub Actions가 별도 `VITE_*` Secret 없이 빌드합니다.
 
-| Secret 이름 | 내용 |
-|-------------|------|
-| `VITE_FIREBASE_API_KEY` | apiKey |
-| `VITE_FIREBASE_AUTH_DOMAIN` | authDomain |
-| `VITE_FIREBASE_PROJECT_ID` | projectId (`linkworks-hak`) |
-| `VITE_FIREBASE_STORAGE_BUCKET` | storageBucket |
-| `VITE_FIREBASE_MESSAGING_SENDER_ID` | messagingSenderId |
-| `VITE_FIREBASE_APP_ID` | appId |
+로컬 개발용으로는 `.env.example`을 복사해 `.env`를 만듭니다. `.env`는 Git에 올라가지 않습니다.
 
-로컬 개발용으로는 프로젝트 루트에 `.env` 파일을 만들고 `.env.example`을 참고해 같은 값을 넣습니다. `.env`는 Git에 올라가지 않습니다.
+```bash
+cp .env.example .env
+# 필요 시 값을 수정한 뒤
+npm run dev
+```
 
 ## 5. 배포 확인
 

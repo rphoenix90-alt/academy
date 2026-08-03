@@ -14,29 +14,19 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # Vite 전환 전: public/ 정적 파일을 그대로 배포
-      # Vite 전환 후: 아래 Node 설치·빌드 주석을 해제하고
-      # firebase.json 의 hosting.public 을 dist 로 바꿉니다.
-      #
-      # - name: Set up Node
-      #   uses: actions/setup-node@v4
-      #   with:
-      #     node-version: 20
-      #     cache: npm
-      # - name: Install dependencies
-      #   run: npm ci
-      # - name: Build
-      #   run: npm run build
-      #   env:
-      #     VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
-      #     VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
-      #     VITE_FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
-      #     VITE_FIREBASE_STORAGE_BUCKET: ${{ secrets.VITE_FIREBASE_STORAGE_BUCKET }}
-      #     VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}
-      #     VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
-      #     VITE_ACADEMY_ID: ${{ secrets.VITE_ACADEMY_ID }}
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
 
-      # 조직 정책으로 서비스 계정 JSON 키가 막힌 경우 → CI 토큰 사용
+      - name: Install dependencies
+        run: npm ci
+
+      # Vite는 .env.production 을 빌드 시 자동으로 읽습니다.
+      - name: Build
+        run: npm run build
+
       - name: Install Firebase CLI
         run: npm install -g firebase-tools
 
