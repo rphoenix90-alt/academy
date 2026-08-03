@@ -356,8 +356,8 @@ export const GeneralModal = ({
                             </div>
 
                             <div className="flex gap-4">
-                                <div className="w-1/3"><label className={labelCls}>주간 횟수</label><input required type="number" name="weeklySessions" min="1" defaultValue={data?.weeklySessions || 2} className={inputCls}/></div>
-                                <div className="flex-1"><label className={labelCls}>기본 수강료 (원)</label><input required type="number" name="price" defaultValue={data?.price} className={inputCls} placeholder="자유 입력"/></div>
+                                <div className="w-1/3"><label className={labelCls}>주간 횟수</label><input required type="number" name="weeklySessions" min="1" defaultValue={data?.weeklySessions || 2} className={inputCls} onWheel={(e) => e.currentTarget.blur()}/></div>
+                                <div className="flex-1"><label className={labelCls}>기본 수강료 (원)</label><input required type="number" name="price" defaultValue={data?.price} className={inputCls} placeholder="자유 입력" onWheel={(e) => e.currentTarget.blur()}/></div>
                             </div>
                             <div>
                                 <label className={labelCls}>메모 / 비고</label>

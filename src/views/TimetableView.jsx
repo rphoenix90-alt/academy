@@ -174,6 +174,15 @@ export const TimetableView = ({ getMyClasses, students, isInstructor, academyInf
                                                         ) : ( <span className="whitespace-pre-wrap">{cls.time}</span> )}
                                                     </div>
                                                     <div className="flex gap-3"><CreditCard className="text-[#a1a1a6] mt-0.5" size={14}/> <span className="font-semibold text-[#1d1d1f]">{Number(cls.price).toLocaleString()}원</span></div>
+                                                    {cls.note && String(cls.note).replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim() ? (
+                                                        <div className="mt-3 rounded-xl bg-[#f5f5f7]/80 border border-[rgba(0,0,0,0.04)] px-3 py-2.5">
+                                                            <p className="text-[9px] font-bold text-[#86868b] uppercase tracking-wider mb-1">메모 / 비고</p>
+                                                            <div
+                                                                className="text-[12px] text-[#1d1d1f] font-medium leading-relaxed prose-note"
+                                                                dangerouslySetInnerHTML={{ __html: cls.note }}
+                                                            />
+                                                        </div>
+                                                    ) : null}
                                                 </div>
                                             </div>
                                             <div className="mt-5 pt-4 border-t border-[rgba(0,0,0,0.05)] flex flex-col gap-2 min-h-[40px]">

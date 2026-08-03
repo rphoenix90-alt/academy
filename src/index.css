@@ -21,6 +21,10 @@ input[type="number"]::-webkit-outer-spin-button {
     -webkit-appearance: none;
     margin: 0;
 }
+input[type="number"] {
+    -moz-appearance: textfield;
+    appearance: textfield;
+}
 
 .nav-btn.active { background-color: #e8e8ed; color: #1d1d1f; font-weight: 600; }
 .nav-btn:hover:not(.active) { background-color: #ececec; }
