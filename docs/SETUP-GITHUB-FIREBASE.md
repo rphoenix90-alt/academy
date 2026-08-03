@@ -33,26 +33,36 @@ gh repo create linkworks-hak --private --source=. --remote=origin --push
 
 ## 4. 자동 배포용 Secret 등록
 
-### 4-1. Firebase 서비스 계정 JSON 받기
+> **참고:** Firebase 콘솔에서 「이 서비스 계정에서는 키를 만들 수 없습니다」가 보이면  
+> 조직 정책 때문에 JSON 키를 쓸 수 없습니다. 아래 **CI 토큰** 방식을 사용하세요.
 
-1. [Firebase Console](https://console.firebase.google.com/) → 프로젝트 **linkworks-hak**
-2. ⚙️ 프로젝트 설정 → **서비스 계정** 탭
-3. **새 비공개 키 생성** → JSON 파일 다운로드
-4. 다운로드한 파일은 안전한 곳에만 두고, GitHub/폴더에 커밋하지 마세요
+### 4-1. Firebase CI 토큰 만들기 (터미널)
+
+먼저 Firebase에 로그인한 뒤:
+
+```bash
+firebase login --reauth
+firebase login:ci
+```
+
+브라우저에서 승인하면 터미널에 **긴 토큰 문자열**이 출력됩니다. 복사해 두세요.
 
 ### 4-2. GitHub Secret 추가
 
-저장소가 생긴 뒤, 터미널에서 (JSON 경로를 본인 파일로 바꾸세요):
+GitHub 웹: 저장소 → Settings → Secrets and variables → Actions → New repository secret
+
+- Name: `FIREBASE_TOKEN`
+- Value: 방금 복사한 토큰 전체
+
+또는 터미널:
 
 ```bash
 export PATH="$HOME/.local/bin:$PATH"
 cd "/Users/kdw/Desktop/학원웹"
-gh secret set FIREBASE_SERVICE_ACCOUNT < ~/Downloads/linkworks-hak-firebase-adminsdk-xxxxx.json
+gh secret set FIREBASE_TOKEN
 ```
 
-또는 GitHub 웹: 저장소 → Settings → Secrets and variables → Actions → New repository secret  
-- Name: `FIREBASE_SERVICE_ACCOUNT`  
-- Value: JSON 파일 내용 전체 붙여넣기
+실행 후 토큰을 붙여넣고 Enter 합니다.
 
 ### 4-3. (Vite 전환 후) Firebase 웹 설정 Secrets
 
