@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { formatDate, primaryBtnCls, secondaryBtnCls, subtleBtnCls, inputCls } from '../lib/utils';
 import { Icon, Plus, Download, Upload, Search, Edit, Trash2, CreditCard } from '../components/Icons';
-export const StudentsView = ({ getMyStudents, isInstructor, openModal, fileInputRef, handleExcelUpload, downloadSampleExcel, deleteItem, classes, setDetailTab }) => {
+export const StudentsView = ({ getMyStudents, isInstructor, openModal, fileInputRef, handleExcelUpload, downloadSampleExcel, deleteItem, classes, setDetailTab, moduleFlags = {} }) => {
     const [studentSearchTerm, setStudentSearchTerm] = useState('');
     const [studentTab, setStudentTab] = useState('list');
     const [studentSortConfig, setStudentSortConfig] = useState({ key: 'name', direction: 'asc' });
@@ -41,12 +41,16 @@ export const StudentsView = ({ getMyStudents, isInstructor, openModal, fileInput
             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-end gap-4 mb-2">
                 <h2 className="text-2xl sm:text-3xl font-bold text-[#1d1d1f] tracking-tight">학생 관리 {isInstructor && <span className="text-sm font-semibold text-[#0066cc] ml-2">(내 수강생)</span>}</h2>
                 <div className="flex flex-wrap items-center gap-2">
-                    <button onClick={() => openModal('sms')} className={secondaryBtnCls}><Icon name="comment-dots"/> 단체 문자</button>
+                    {moduleFlags.sms && <button onClick={() => openModal('sms')} className={secondaryBtnCls}><Icon name="comment-dots"/> 단체 문자</button>}
                     {!isInstructor && (
                         <>
-                            <input type="file" accept=".xlsx, .xls" ref={fileInputRef} onChange={handleExcelUpload} className="hidden" />
-                            <button onClick={downloadSampleExcel} className={subtleBtnCls} title="샘플 양식 다운로드"><Download size={12}/> 샘플 양식</button>
-                            <button onClick={() => fileInputRef.current.click()} className={secondaryBtnCls}><Upload size={12}/> 엑셀 업로드</button>
+                            {moduleFlags.excelImport && (
+                              <>
+                                <input type="file" accept=".xlsx, .xls" ref={fileInputRef} onChange={handleExcelUpload} className="hidden" />
+                                <button onClick={downloadSampleExcel} className={subtleBtnCls} title="샘플 양식 다운로드"><Download size={12}/> 샘플 양식</button>
+                                <button onClick={() => fileInputRef.current.click()} className={secondaryBtnCls}><Upload size={12}/> 엑셀 업로드</button>
+                              </>
+                            )}
                             <button onClick={() => openModal('student')} className={primaryBtnCls}><Plus size={12}/> 신규 등록</button>
                         </>
                     )}

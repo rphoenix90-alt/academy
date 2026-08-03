@@ -16,15 +16,16 @@ import {
   triggerNotification, generateId, formatDate, useLocalStorage,
 } from './lib/utils';
 import {
-  Icon, LayoutDashboard, Users, BookOpen, CalendarDays, CreditCard, Building, UserIcon,
+  Icon, LayoutDashboard, Users, BookOpen, Building, UserIcon,
 } from './components/Icons';
 import { LoginView } from './views/LoginView';
 import { DashboardView } from './views/DashboardView';
 import { AcademyView } from './views/AcademyView';
 import { StudentsView } from './views/StudentsView';
 import { ClassesView } from './views/ClassesView';
-import { TimetableView } from './views/TimetableView';
-import { TuitionView } from './views/TuitionView';
+import { TimetableView } from './modules/timetable';
+import { TuitionView } from './modules/settlement';
+import { buildNavItems, getModuleFlags, isModuleEnabled } from './registry';
 import { StudentDetailModal } from './components/StudentDetailModal';
 import { GeneralModal } from './components/GeneralModal';
 
@@ -486,15 +487,20 @@ export default function App() {
         );
     }
 
-    const navItems = [
-        { id:'dashboard', name:'Dashboard', icon: LayoutDashboard, roles: ['원장', '관리자', '강사'] }, 
-        { id:'academy', name:'Academy', icon: Building, roles: ['원장', '관리자'] },
-        { id:'students', name:'Students', icon: Users, roles: ['원장', '관리자', '강사'] }, 
-        { id:'classes', name:'Classes & Books', icon: BookOpen, roles: ['원장', '관리자', '강사'] },
-        { id:'timetable', name:'Timetable', icon: CalendarDays, roles: ['원장', '관리자', '강사'] },
-        { id:'tuition', name:'Settlement', icon: CreditCard, roles: ['원장', '관리자', '강사'] }
+    const coreNavItems = [
+        { id: 'dashboard', name: 'Dashboard', icon: LayoutDashboard, roles: ['원장', '관리자', '강사'] },
+        { id: 'academy', name: 'Academy', icon: Building, roles: ['원장', '관리자'] },
+        { id: 'students', name: 'Students', icon: Users, roles: ['원장', '관리자', '강사'] },
+        { id: 'classes', name: 'Classes', icon: BookOpen, roles: ['원장', '관리자', '강사'] },
     ];
-    const visibleNavItems = navItems.filter(item => item.roles.includes(currentUser.role));
+    const navItems = buildNavItems(academyInfo, coreNavItems);
+    const visibleNavItems = navItems.filter((item) => item.roles.includes(currentUser.role));
+    const moduleFlags = getModuleFlags(academyInfo);
+
+    useEffect(() => {
+        const allowed = visibleNavItems.map((i) => i.id);
+        if (!allowed.includes(activeTab)) setActiveTab('dashboard');
+    }, [academyInfo?.enabledModules, currentUser?.role, activeTab]);
 
     return (
         <div className={"flex h-screen font-sans " + (isPrintMode ? 'print-mode bg-white' : 'bg-[#f5f5f7]')}>
@@ -544,16 +550,16 @@ export default function App() {
             <main className="flex-1 overflow-hidden flex flex-col relative w-full bg-white lg:rounded-l-[2rem] lg:border-l lg:border-y border-[rgba(0,0,0,0.05)] lg:my-2 shadow-[-10px_0_30px_rgba(0,0,0,0.02)]">
                 <div className="flex-1 overflow-auto custom-scrollbar w-full print-container px-4 py-20 lg:p-12">
                     {activeTab === 'dashboard' && <DashboardView currentUser={currentUser} isInstructor={isInstructor} getMyStudents={getMyStudents} calcTeacherStats={calcTeacherStats} students={students} dashboardMemos={dashboardMemos} setDashboardMemos={setDashboardMemos} adminMemoMode={adminMemoMode} setAdminMemoMode={setAdminMemoMode} />}
-                    {activeTab === 'academy' && <AcademyView academyInfo={academyInfo} instructors={instructors} openModal={openModal} deleteItem={deleteItem} handleBackupData={handleBackupData} handleRestoreData={handleRestoreData} backupInputRef={backupInputRef} />}
-                    {activeTab === 'students' && <StudentsView getMyStudents={getMyStudents} isInstructor={isInstructor} openModal={openModal} deleteItem={deleteItem} fileInputRef={fileInputRef} handleExcelUpload={handleExcelUpload} downloadSampleExcel={downloadSampleExcel} classes={classes} setDetailTab={setDetailTab} />}
-                    {activeTab === 'classes' && <ClassesView getMyClasses={getMyClasses} isInstructor={isInstructor} openModal={openModal} deleteItem={deleteItem} students={students} setDetailTab={setDetailTab} textbooks={textbooks} />}
-                    {activeTab === 'timetable' && <TimetableView getMyClasses={getMyClasses} students={students} isInstructor={isInstructor} academyInfo={academyInfo} currentUser={currentUser} openModal={openModal} handlePrint={handlePrint} isPrintMode={isPrintMode} setDetailTab={setDetailTab} />}
-                    {activeTab === 'tuition' && <TuitionView currentUser={currentUser} isInstructor={isInstructor} instructors={instructors} calcSettlementDetails={calcSettlementDetails} calcTeacherStats={calcTeacherStats} handleSessionChange={handleSessionChange} handleSettlementChange={handleSettlementChange} handlePrint={handlePrint} isPrintMode={isPrintMode} settlements={settlements} openModal={openModal} setDetailTab={setDetailTab} />}
+                    {activeTab === 'academy' && <AcademyView academyInfo={academyInfo} setAcademyInfo={setAcademyInfo} instructors={instructors} openModal={openModal} deleteItem={deleteItem} handleBackupData={handleBackupData} handleRestoreData={handleRestoreData} backupInputRef={backupInputRef} />}
+                    {activeTab === 'students' && <StudentsView getMyStudents={getMyStudents} isInstructor={isInstructor} openModal={openModal} deleteItem={deleteItem} fileInputRef={fileInputRef} handleExcelUpload={handleExcelUpload} downloadSampleExcel={downloadSampleExcel} classes={classes} setDetailTab={setDetailTab} moduleFlags={moduleFlags} />}
+                    {activeTab === 'classes' && <ClassesView getMyClasses={getMyClasses} isInstructor={isInstructor} openModal={openModal} deleteItem={deleteItem} students={students} setDetailTab={setDetailTab} textbooks={textbooks} moduleFlags={moduleFlags} />}
+                    {activeTab === 'timetable' && isModuleEnabled(academyInfo, 'timetable') && <TimetableView getMyClasses={getMyClasses} students={students} isInstructor={isInstructor} academyInfo={academyInfo} currentUser={currentUser} openModal={openModal} handlePrint={handlePrint} isPrintMode={isPrintMode} setDetailTab={setDetailTab} />}
+                    {activeTab === 'tuition' && isModuleEnabled(academyInfo, 'settlement') && <TuitionView currentUser={currentUser} isInstructor={isInstructor} instructors={instructors} calcSettlementDetails={calcSettlementDetails} calcTeacherStats={calcTeacherStats} handleSessionChange={handleSessionChange} handleSettlementChange={handleSettlementChange} handlePrint={handlePrint} isPrintMode={isPrintMode} settlements={settlements} openModal={openModal} setDetailTab={setDetailTab} />}
                 </div>
             </main>
 
             {modalState.isOpen && modalState.type === 'studentDetail' && (
-                <StudentDetailModal stdId={modalState.data} students={students} classes={classes} currentUser={currentUser} isInstructor={isInstructor} isCloudActive={isCloudActive} db={db} setStudents={setStudents} closeModal={closeModal} openModal={openModal} detailTab={detailTab} setDetailTab={setDetailTab} />
+                <StudentDetailModal stdId={modalState.data} students={students} classes={classes} currentUser={currentUser} isInstructor={isInstructor} isCloudActive={isCloudActive} db={db} setStudents={setStudents} closeModal={closeModal} openModal={openModal} detailTab={detailTab} setDetailTab={setDetailTab} academyInfo={academyInfo} />
                     )}
                     
                     {modalState.isOpen && modalState.type !== 'studentDetail' && (
@@ -565,6 +571,7 @@ export default function App() {
                     modalStudentSearchTerm={modalStudentSearchTerm} setModalStudentSearchTerm={setModalStudentSearchTerm} isWithdrawnStatus={isWithdrawnStatus} 
                     setIsWithdrawnStatus={setIsWithdrawnStatus} smsSelectedIds={smsSelectedIds} setSmsSelectedIds={setSmsSelectedIds} 
                     smsContent={smsContent} setSmsContent={setSmsContent} getMyStudents={getMyStudents} textbooks={textbooks} setTextbooks={setTextbooks}
+                    moduleFlags={moduleFlags}
                 />
             )}
         </div>

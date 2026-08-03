@@ -20,18 +20,9 @@ import {
   legacySettlementsDoc,
 } from './paths';
 import { stripPassword } from './auth';
+import { DEFAULT_ENABLED_MODULES } from '../registry';
 
 const FLAG_KEY = `lw_migrated_to_academies_${academyId}`;
-
-const DEFAULT_MODULES = [
-  'timetable',
-  'settlement',
-  'grades',
-  'counseling',
-  'textbooks',
-  'excel-import',
-  'sms',
-];
 
 /**
  * 예전 artifacts/... 데이터를 academies/{academyId}/... 로 한 번만 복사합니다.
@@ -77,7 +68,7 @@ export async function migrateLegacyDataIfNeeded(db) {
         phone: '',
         bizNumber: '',
         ceoName: '',
-        enabledModules: DEFAULT_MODULES,
+        enabledModules: DEFAULT_ENABLED_MODULES,
         createdAt: new Date().toISOString(),
       }, { merge: true });
     }
@@ -94,13 +85,13 @@ export async function migrateLegacyDataIfNeeded(db) {
     const academyData = oldAcademy.exists()
       ? {
           ...stripPassword(oldAcademy.data()),
-          enabledModules: DEFAULT_MODULES,
+          enabledModules: DEFAULT_ENABLED_MODULES,
           migratedFrom: 'artifacts',
           migratedAt: new Date().toISOString(),
         }
       : {
           name: '학원',
-          enabledModules: DEFAULT_MODULES,
+          enabledModules: DEFAULT_ENABLED_MODULES,
           migratedFrom: 'artifacts',
           migratedAt: new Date().toISOString(),
         };
@@ -108,7 +99,7 @@ export async function migrateLegacyDataIfNeeded(db) {
   } else {
     queue(academyDoc(db), {
       ...newAcademy.data(),
-      enabledModules: newAcademy.data().enabledModules || DEFAULT_MODULES,
+      enabledModules: newAcademy.data().enabledModules || DEFAULT_ENABLED_MODULES,
       migratedFrom: 'artifacts',
       migratedAt: new Date().toISOString(),
     });

@@ -5,6 +5,7 @@ import {
   triggerNotification, generateId, formatDate, inputCls, labelCls, subtleBtnCls,
 } from '../lib/utils';
 import { Icon, UserIcon, XIcon, Edit, Save, Plus, Trash2, Check } from './Icons';
+import { getEnabledStudentTabs } from '../registry';
 
 function ScoreGraph({ data, title, color }) {
     if (!data || data.length === 0) return <div className="flex-1 bg-[#f5f5f7] rounded-3xl p-8 flex items-center justify-center text-[#86868b] text-sm font-medium">{title} 데이터가 없습니다.</div>;
@@ -43,7 +44,7 @@ function ScoreGraph({ data, title, color }) {
 };
 
 
-export const StudentDetailModal = ({ stdId, students, classes, currentUser, isInstructor, isCloudActive, db, setStudents, closeModal, openModal, detailTab, setDetailTab }) => {
+export const StudentDetailModal = ({ stdId, students, classes, currentUser, isInstructor, isCloudActive, db, setStudents, closeModal, openModal, detailTab, setDetailTab, academyInfo }) => {
     const [isClassManageOpen, setIsClassManageOpen] = useState(false);
     const [expandedTuitionId, setExpandedTuitionId] = useState(null);
     const [editingTuition, setEditingTuition] = useState(null);
@@ -195,9 +196,12 @@ export const StudentDetailModal = ({ stdId, students, classes, currentUser, isIn
                             {[
                                 { id: 'basic', label: '기본 정보', icon: 'id-card' },
                                 { id: 'history', label: '수강 이력', icon: 'history' },
-                                { id: 'grades', label: '성적 관리', icon: 'chart-line' },
-                                { id: 'counseling', label: '상담 이력', icon: 'comments' }
-                            ].concat(!isInstructor ? [{ id: 'tuition', label: '수강료 현황', icon: 'credit-card' }] : []).map(t => (
+                                { id: 'grades', label: '성적 관리', icon: 'chart-line', module: 'grades' },
+                                { id: 'counseling', label: '상담 이력', icon: 'comments', module: 'counseling' },
+                            ]
+                              .concat(!isInstructor ? [{ id: 'tuition', label: '수강료 현황', icon: 'credit-card' }] : [])
+                              .filter((t) => !t.module || getEnabledStudentTabs(academyInfo).includes(t.id))
+                              .map(t => (
                                 <button key={t.id} onClick={() => setDetailTab(t.id)} className={`flex items-center gap-3 px-4 py-2.5 text-[12px] font-semibold rounded-xl transition-all whitespace-nowrap ${detailTab === t.id ? 'bg-white text-[#1d1d1f] shadow-sm border border-[rgba(0,0,0,0.02)]' : 'text-[#86868b] hover:bg-[#e8e8ed] hover:text-[#1d1d1f] border border-transparent'}`}>
                                     <Icon name={t.icon} className={detailTab === t.id ? 'text-[#0066cc]' : 'text-[#a1a1a6]'} /> {t.label}
                                 </button>

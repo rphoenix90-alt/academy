@@ -1,7 +1,9 @@
 import React from 'react';
 import { primaryBtnCls, secondaryBtnCls, subtleBtnCls } from '../lib/utils';
 import { Icon, Users, Plus, Edit, Trash2, Download, Upload } from '../components/Icons';
-export const AcademyView = ({ academyInfo, instructors, openModal, deleteItem, handleBackupData, handleRestoreData, backupInputRef }) => {
+import { ModuleSettingsPanel } from '../components/ModuleSettingsPanel';
+
+export const AcademyView = ({ academyInfo, setAcademyInfo, instructors, openModal, deleteItem, handleBackupData, handleRestoreData, backupInputRef }) => {
     const sortedInstructors = [...instructors].sort((a, b) => a.name.localeCompare(b.name));
     const groupedInstructors = { '원장': [], '관리자': [], '강사': [] };
     sortedInstructors.forEach(inst => {
@@ -41,6 +43,8 @@ export const AcademyView = ({ academyInfo, instructors, openModal, deleteItem, h
                                 <button onClick={() => backupInputRef.current.click()} className="w-full bg-[#f5f5f7] hover:bg-[#e8e8ed] text-[#1d1d1f] font-medium py-3 rounded-xl transition-all flex justify-center items-center gap-2 text-[13px]"><Upload size={14}/> 백업 파일 복원</button>
                             </div>
                         </div>
+
+                        <ModuleSettingsPanel academyInfo={academyInfo} setAcademyInfo={setAcademyInfo} />
                     </div>
                 </div>
 

@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { primaryBtnCls, subtleBtnCls } from '../lib/utils';
 import { Icon, Plus, Search, Edit, Trash2 } from '../components/Icons';
-export const ClassesView = ({ getMyClasses, isInstructor, openModal, deleteItem, students, setDetailTab, textbooks }) => {
-    const [activeTab, setActiveTab] = useState('classes'); 
+export const ClassesView = ({ getMyClasses, isInstructor, openModal, deleteItem, students, setDetailTab, textbooks, moduleFlags = {} }) => {
+    const [activeTab, setActiveTab] = useState('classes');
+    const tab = moduleFlags.textbooks ? activeTab : 'classes';
     const [classSearchTerm, setClassSearchTerm] = useState('');
     const [classSubjectFilter, setClassSubjectFilter] = useState('전체');
     const [classGradeFilter, setClassGradeFilter] = useState('전체');
@@ -32,19 +33,21 @@ export const ClassesView = ({ getMyClasses, isInstructor, openModal, deleteItem,
     return (
         <div className="space-y-6 animate-in fade-in duration-500 max-w-[1200px] mx-auto">
             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-end gap-4 mb-2">
-                <h2 className="text-2xl sm:text-3xl font-bold text-[#1d1d1f] tracking-tight">클래스 및 교재 {isInstructor && <span className="text-[15px] font-medium text-[#0066cc] ml-2">(내 강의)</span>}</h2>
+                <h2 className="text-2xl sm:text-3xl font-bold text-[#1d1d1f] tracking-tight">클래스{moduleFlags.textbooks ? ' 및 교재' : ''} {isInstructor && <span className="text-[15px] font-medium text-[#0066cc] ml-2">(내 강의)</span>}</h2>
                 <div className="flex gap-2 w-full sm:w-auto">
-                    {!isInstructor && activeTab === 'classes' && <button onClick={() => openModal('class')} className={primaryBtnCls}><Plus size={12}/> 새 학급 개설</button>}
-                    {!isInstructor && activeTab === 'textbooks' && <button onClick={() => openModal('textbook')} className={primaryBtnCls}><Plus size={12}/> 새 교재 등록</button>}
+                    {!isInstructor && tab === 'classes' && <button onClick={() => openModal('class')} className={primaryBtnCls}><Plus size={12}/> 새 학급 개설</button>}
+                    {moduleFlags.textbooks && !isInstructor && tab === 'textbooks' && <button onClick={() => openModal('textbook')} className={primaryBtnCls}><Plus size={12}/> 새 교재 등록</button>}
                 </div>
             </div>
 
+            {moduleFlags.textbooks ? (
             <div className="flex gap-2 p-1 bg-[#f5f5f7] rounded-full w-max max-w-full custom-scrollbar overflow-x-auto">
-                <button onClick={() => setActiveTab('classes')} className={`px-5 py-2 rounded-full font-semibold text-[13px] transition-all whitespace-nowrap ${activeTab === 'classes' ? 'bg-white text-[#1d1d1f] shadow-sm' : 'text-[#86868b] hover:text-[#1d1d1f]'}`}>클래스 관리</button>
-                <button onClick={() => setActiveTab('textbooks')} className={`px-5 py-2 rounded-full font-semibold text-[13px] transition-all whitespace-nowrap ${activeTab === 'textbooks' ? 'bg-white text-[#1d1d1f] shadow-sm' : 'text-[#86868b] hover:text-[#1d1d1f]'}`}>교재 관리</button>
+                <button onClick={() => setActiveTab('classes')} className={`px-5 py-2 rounded-full font-semibold text-[13px] transition-all whitespace-nowrap ${tab === 'classes' ? 'bg-white text-[#1d1d1f] shadow-sm' : 'text-[#86868b] hover:text-[#1d1d1f]'}`}>클래스 관리</button>
+                <button onClick={() => setActiveTab('textbooks')} className={`px-5 py-2 rounded-full font-semibold text-[13px] transition-all whitespace-nowrap ${tab === 'textbooks' ? 'bg-white text-[#1d1d1f] shadow-sm' : 'text-[#86868b] hover:text-[#1d1d1f]'}`}>교재 관리</button>
             </div>
+            ) : null}
 
-            {activeTab === 'classes' && (
+            {tab === 'classes' && (
                 <div className="animate-in fade-in duration-300">
                     <div className="flex flex-col sm:flex-row gap-3 mb-8">
                         <select value={classSubjectFilter} onChange={(e) => setClassSubjectFilter(e.target.value)} className="w-full sm:w-32 text-[13px] bg-white border border-[rgba(0,0,0,0.05)] rounded-full px-4 py-2.5 outline-none font-medium">
@@ -150,7 +153,7 @@ export const ClassesView = ({ getMyClasses, isInstructor, openModal, deleteItem,
                 </div>
             )}
 
-            {activeTab === 'textbooks' && (
+            {moduleFlags.textbooks && tab === 'textbooks' && (
                 <div className="animate-in fade-in duration-300">
                     <div className="mb-6">
                         <select value={textbookSubjectFilter} onChange={(e) => setTextbookSubjectFilter(e.target.value)} className="w-full sm:w-40 text-[13px] bg-white border border-[rgba(0,0,0,0.05)] rounded-full px-4 py-2.5 outline-none font-medium">
