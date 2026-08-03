@@ -1,11 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { setDoc } from 'firebase/firestore';
 import {
   academyDoc, instructorDoc, studentDoc, classDoc, textbookDoc,
 } from '../lib/paths';
 import {
   triggerNotification, generateId, formatDate, formatPhoneNumber, timeOptions,
-  inputCls, labelCls, primaryBtnCls, secondaryBtnCls,
+  inputCls, labelCls, primaryBtnCls, secondaryBtnCls, compressImageToDataUrl,
 } from '../lib/utils';
 import { normalizePhoneDigits } from '../lib/auth';
 import { XIcon, Plus } from './Icons';
@@ -20,8 +20,30 @@ export const GeneralModal = ({
     const { type, data } = modalState;
     const isEdit = !!data;
     const [classEnrollDate, setClassEnrollDate] = useState(() => formatDate(new Date()));
+    const [logoUrl, setLogoUrl] = useState('');
+    const [logoBusy, setLogoBusy] = useState(false);
+
+    useEffect(() => {
+        if (type === 'academyEdit') setLogoUrl(data?.logoUrl || academyInfo?.logoUrl || '');
+    }, [type, data, academyInfo?.logoUrl]);
 
     const handlePhoneInput = (e) => { e.target.value = formatPhoneNumber(e.target.value); };
+
+    const handleLogoFile = async (e) => {
+        const file = e.target.files?.[0];
+        e.target.value = '';
+        if (!file) return;
+        setLogoBusy(true);
+        try {
+            const url = await compressImageToDataUrl(file);
+            setLogoUrl(url);
+            triggerNotification('로고 이미지를 준비했습니다. 저장을 눌러 반영하세요.');
+        } catch (err) {
+            triggerNotification(err.message || '로고 업로드 실패', true);
+        } finally {
+            setLogoBusy(false);
+        }
+    };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -119,7 +141,7 @@ export const GeneralModal = ({
                     }
                 }
             } else if (type === 'academyEdit') {
-                const updatedAcademy = { ...academyInfo, ...obj };
+                const updatedAcademy = { ...academyInfo, ...obj, logoUrl: logoUrl || '' };
                 if(isCloudActive) await setDoc(academyDoc(db), updatedAcademy);
                 else setAcademyInfo(updatedAcademy);
             } else if (type === 'textbook') {
@@ -182,8 +204,39 @@ export const GeneralModal = ({
                             <div><label className={labelCls}>학원명</label><input required name="name" defaultValue={data?.name} className={inputCls}/></div>
                             <div><label className={labelCls}>대표자명</label><input required name="ceoName" defaultValue={data?.ceoName} className={inputCls}/></div>
                             <div><label className={labelCls}>사업자번호</label><input name="bizNumber" defaultValue={data?.bizNumber} className={inputCls}/></div>
-                            <div><label className={labelCls}>대표 연락처</label><input required name="phone" defaultValue={data?.phone} onInput={handlePhoneInput} className={inputCls}/></div>
+                            <div><label className={labelCls}>대표 연락처 (상담 문의·인쇄 푸터)</label><input required name="phone" defaultValue={data?.phone} onInput={handlePhoneInput} className={inputCls}/></div>
                             <div><label className={labelCls}>소재지</label><input required name="address" defaultValue={data?.address} className={inputCls}/></div>
+                            <div>
+                                <label className={labelCls}>학원 로고 (인쇄물 반영)</label>
+                                <div className="flex items-center gap-4 bg-[#f5f5f7] rounded-2xl p-4 border border-[rgba(0,0,0,0.05)]">
+                                    <div className="w-16 h-16 rounded-xl bg-white border border-[rgba(0,0,0,0.06)] flex items-center justify-center overflow-hidden shrink-0">
+                                        {logoUrl ? (
+                                            <img src={logoUrl} alt="로고 미리보기" className="w-full h-full object-contain" />
+                                        ) : (
+                                            <span className="text-[10px] font-semibold text-[#a1a1a6]">없음</span>
+                                        )}
+                                    </div>
+                                    <div className="flex-1 space-y-2">
+                                        <input
+                                            type="file"
+                                            accept="image/png,image/jpeg,image/webp,image/gif"
+                                            onChange={handleLogoFile}
+                                            disabled={logoBusy}
+                                            className="block w-full text-[12px] text-[#86868b] file:mr-3 file:py-2 file:px-3 file:rounded-full file:border-0 file:text-[12px] file:font-semibold file:bg-white file:text-[#1d1d1f] hover:file:bg-[#e8e8ed]"
+                                        />
+                                        <div className="flex gap-2">
+                                            {logoUrl ? (
+                                                <button type="button" onClick={() => setLogoUrl('')} className="text-[11px] font-semibold text-[#ff3b30] hover:underline">
+                                                    로고 제거
+                                                </button>
+                                            ) : null}
+                                            <span className="text-[10px] text-[#86868b] font-medium">
+                                                {logoBusy ? '처리 중…' : '정사각·투명 PNG 권장 · 자동 압축'}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </>}
 
                         {type === 'student' && <>

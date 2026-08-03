@@ -1,6 +1,18 @@
 import React, { useState } from 'react';
-import { formatDate, primaryBtnCls, secondaryBtnCls } from '../lib/utils';
+import { primaryBtnCls, secondaryBtnCls, getSubjectCardStyle } from '../lib/utils';
 import { BookOpen, Plus, Printer, Clock, CreditCard } from '../components/Icons';
+import { PrintDocument } from '../components/PrintDocument';
+
+const SUBJECT_ORDER = ['국어', '수학', '영어', '과학', '사회', '기타'];
+
+function sortSubjects(entries) {
+  return [...entries].sort((a, b) => {
+    const ia = SUBJECT_ORDER.indexOf(a[0]);
+    const ib = SUBJECT_ORDER.indexOf(b[0]);
+    return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+  });
+}
+
 export const TimetableView = ({ getMyClasses, students, isInstructor, academyInfo, currentUser, openModal, handlePrint, isPrintMode, setDetailTab }) => {
     const [timetableTab, setTimetableTab] = useState('전체');
     
@@ -25,54 +37,73 @@ export const TimetableView = ({ getMyClasses, students, isInstructor, academyInf
     const availableTabs = ['고3', '고2', '고1', '중3', '중2', '중1', '중등', '초등', '전학년'].filter(tab => grouped[tab]);
     const displayTab = availableTabs.includes(timetableTab) ? timetableTab : (availableTabs.length > 0 ? availableTabs[0] : null);
     const currentTabClasses = displayTab ? grouped[displayTab] : {};
+    const subjectEntries = sortSubjects(Object.entries(currentTabClasses));
 
     if (isPrintMode) {
         return (
-            <div className="bg-white p-8 w-full max-w-[210mm] min-h-[297mm] mx-auto text-black font-sans print:m-0 print:shadow-none print:max-w-none flex flex-col justify-between">
-                <div>
-                    <div className="text-center mb-8 border-b-2 border-black pb-4">
-                        <h1 className="text-2xl font-bold mb-1 tracking-tight">{academyInfo.name || '학원'} {displayTab} 종합 시간표 {isInstructor && `(${currentUser.name})`}</h1>
-                        <p className="text-xs font-semibold text-gray-500">업데이트: {formatDate(new Date())}</p>
-                    </div>
-                    {Object.entries(currentTabClasses).map(([subject, classesList], idx) => (
-                        <div key={idx} className="mb-8 page-break-inside-avoid">
-                            <h2 className="text-lg font-bold text-black mb-2 border-l-4 border-black pl-2">{subject}</h2>
-                            <table className="w-full text-xs text-left border-collapse border border-gray-300">
+            <PrintDocument
+                academyInfo={academyInfo}
+                docLabel="TIMETABLE"
+                title={`${displayTab || ''} 종합 시간표`}
+                subtitle={isInstructor ? `${currentUser.name} 전용 · ${academyInfo?.name || '학원'}` : (academyInfo?.name || '학원')}
+            >
+                {subjectEntries.length === 0 ? (
+                    <p className="text-center text-[12px] text-[#86868b] py-16">배정된 강의가 없습니다.</p>
+                ) : subjectEntries.map(([subject, classesList]) => {
+                    const style = getSubjectCardStyle(subject);
+                    return (
+                        <div key={subject} className="mb-7 page-break-inside-avoid">
+                            <div
+                                className="flex items-center gap-2 px-3 py-2 rounded-lg mb-2.5"
+                                style={{
+                                    backgroundColor: style.bg,
+                                    borderLeft: `4px solid ${style.accent}`,
+                                }}
+                            >
+                                <span className="text-[13px] font-bold tracking-tight" style={{ color: style.accent }}>{subject}</span>
+                            </div>
+                            <table className="w-full text-[11px] text-left border-collapse print-table">
                                 <thead>
-                                    <tr className="bg-gray-100 font-bold border-b border-gray-300">
-                                        <th className="p-2 border-r border-gray-300 w-1/4">강좌명</th>
-                                        <th className="p-2 border-r border-gray-300 w-1/6 text-center">담당 강사</th>
-                                        <th className="p-2 border-r border-gray-300 w-1/4">수업 시간</th>
-                                        <th className="p-2 border-r border-gray-300 w-1/6 text-right">수강료</th>
-                                        <th className="p-2">비고</th>
+                                    <tr>
+                                        <th className="py-2.5 px-3 font-bold text-[#86868b] border-b border-[#1d1d1f]/15 w-[26%]">강좌명</th>
+                                        <th className="py-2.5 px-3 font-bold text-[#86868b] border-b border-[#1d1d1f]/15 w-[14%] text-center">담당</th>
+                                        <th className="py-2.5 px-3 font-bold text-[#86868b] border-b border-[#1d1d1f]/15 w-[28%]">수업 시간</th>
+                                        <th className="py-2.5 px-3 font-bold text-[#86868b] border-b border-[#1d1d1f]/15 w-[14%] text-right">수강료</th>
+                                        <th className="py-2.5 px-3 font-bold text-[#86868b] border-b border-[#1d1d1f]/15">비고</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {classesList.map(cls => (
-                                        <tr key={cls.id} className="border-b border-gray-200">
-                                            <td className="p-2 border-r border-gray-300 font-bold">{cls.name}</td>
-                                            <td className="p-2 border-r border-gray-300 text-center">{cls.teacherName}</td>
-                                            <td className="p-2 border-r border-gray-300">
+                                    {classesList.map((cls, rowIdx) => (
+                                        <tr key={cls.id} className={rowIdx % 2 === 0 ? 'bg-[#fafafa]' : 'bg-white'}>
+                                            <td className="py-2.5 px-3 font-bold text-[#1d1d1f] border-b border-[#1d1d1f]/06">{cls.name}</td>
+                                            <td className="py-2.5 px-3 text-center text-[#1d1d1f] border-b border-[#1d1d1f]/06">{cls.teacherName}</td>
+                                            <td className="py-2.5 px-3 border-b border-[#1d1d1f]/06">
                                                 {cls.schedules && cls.schedules.length > 0 ? (
-                                                    <div className="flex flex-col gap-1">
+                                                    <div className="flex flex-col gap-0.5">
                                                         {cls.schedules.map(sch => (
-                                                            <div key={sch.id} className="flex items-center gap-1 flex-wrap">
-                                                                <span className="text-[10px] font-bold">{sch.days.join('/')} {sch.start}~{sch.end}</span>
-                                                            </div>
+                                                            <span key={sch.id} className="font-semibold text-[#1d1d1f]">
+                                                                {sch.days.join('/')} {sch.start}~{sch.end}
+                                                            </span>
                                                         ))}
                                                     </div>
-                                                ) : ( <span className="whitespace-pre-wrap text-[10px]">{cls.time}</span> )}
+                                                ) : (
+                                                    <span className="whitespace-pre-wrap text-[#1d1d1f]">{cls.time}</span>
+                                                )}
                                             </td>
-                                            <td className="p-2 border-r border-gray-300 text-right">{Number(cls.price).toLocaleString()}원</td>
-                                            <td className="p-2 whitespace-pre-wrap text-[10px] leading-tight"><div dangerouslySetInnerHTML={{ __html: cls.note || '' }} className="text-gray-600"></div></td>
+                                            <td className="py-2.5 px-3 text-right font-semibold text-[#1d1d1f] border-b border-[#1d1d1f]/06">
+                                                {Number(cls.price).toLocaleString()}원
+                                            </td>
+                                            <td className="py-2.5 px-3 text-[10px] text-[#636366] border-b border-[#1d1d1f]/06 leading-snug">
+                                                <div dangerouslySetInnerHTML={{ __html: cls.note || '—' }} />
+                                            </td>
                                         </tr>
                                     ))}
                                 </tbody>
                             </table>
                         </div>
-                    ))}
-                </div>
-            </div>
+                    );
+                })}
+            </PrintDocument>
         );
     }
 
@@ -94,9 +125,27 @@ export const TimetableView = ({ getMyClasses, students, isInstructor, academyInf
             </div>
 
             <div className="space-y-8">
-                {Object.keys(currentTabClasses).length > 0 ? Object.entries(currentTabClasses).map(([subject, classesList], groupIdx) => (
-                    <div key={groupIdx} className="bg-white rounded-3xl apple-shadow border border-[rgba(0,0,0,0.05)] overflow-hidden relative">
-                        <div className="bg-[#f5f5f7]/50 px-6 sm:px-8 py-5 flex items-center gap-3 border-b border-[rgba(0,0,0,0.05)]"><BookOpen className="text-[#86868b]"/><h3 className="text-[15px] font-bold text-[#1d1d1f] uppercase tracking-widest">{subject}</h3></div>
+                {subjectEntries.length > 0 ? subjectEntries.map(([subject, classesList]) => {
+                    const style = getSubjectCardStyle(subject);
+                    return (
+                    <div
+                        key={subject}
+                        className="rounded-3xl apple-shadow border overflow-hidden relative"
+                        style={{
+                            backgroundColor: '#fff',
+                            borderColor: style.border,
+                            borderLeftWidth: '4px',
+                            borderLeftColor: style.accent,
+                        }}
+                    >
+                        <div
+                            className="px-6 sm:px-8 py-5 flex items-center gap-3 border-b"
+                            style={{ backgroundColor: style.bg, borderColor: style.border }}
+                        >
+                            <BookOpen />
+                            <h3 className="text-[15px] font-bold tracking-widest" style={{ color: style.accent }}>{subject}</h3>
+                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${style.badge}`}>{classesList.length}</span>
+                        </div>
                         <div className="p-6 sm:p-8">
                             <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
                                 {classesList.map(cls => {
@@ -148,11 +197,11 @@ export const TimetableView = ({ getMyClasses, students, isInstructor, academyInf
                             </div>
                         </div>
                     </div>
-                )) : (
+                    );
+                }) : (
                     <div className="py-20 text-center text-[#86868b] font-medium text-[13px]">해당 그룹에 배정된 강의가 없습니다.</div>
                 )}
             </div>
         </div>
     );
 };
-

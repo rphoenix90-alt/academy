@@ -1,7 +1,13 @@
 import React, { useState } from 'react';
 import { formatDate, secondaryBtnCls } from '../lib/utils';
 import { ChevronRight, ArrowLeft, Printer } from '../components/Icons';
-export const TuitionView = ({ currentUser, isInstructor, instructors, calcSettlementDetails, calcTeacherStats, handleSessionChange, handleSettlementChange, handlePrint, isPrintMode, settlements, openModal, setDetailTab }) => {
+import { PrintDocument } from '../components/PrintDocument';
+
+export const TuitionView = ({
+  currentUser, isInstructor, instructors, academyInfo,
+  calcSettlementDetails, calcTeacherStats, handleSessionChange, handleSettlementChange,
+  handlePrint, isPrintMode, settlements, openModal, setDetailTab,
+}) => {
     const [tuitionMonth, setTuitionMonth] = useState(formatDate(new Date()).substring(0, 7));
     const [selectedTeacherForSettlement, setSelectedTeacherForSettlement] = useState(null);
 
@@ -15,30 +21,58 @@ export const TuitionView = ({ currentUser, isInstructor, instructors, calcSettle
         const { details, totalAmount } = calcSettlementDetails(activeTeacherId, tuitionMonth);
         if(!t) return null;
         return (
-            <div className="bg-white w-full max-w-[210mm] min-h-[297mm] mx-auto text-black font-sans print:m-0 print:shadow-none print:max-w-none print:p-8">
-                <div className="text-center mb-10 border-b-2 border-black pb-6">
-                    <h1 className="text-3xl font-bold mb-2 tracking-tight">강사 강의료 정산 명세서</h1>
-                    <p className="text-sm font-semibold text-gray-500">정산 기준 월: {tuitionMonth}</p>
+            <PrintDocument
+                academyInfo={academyInfo}
+                docLabel="SETTLEMENT"
+                title="강사 강의료 정산 명세서"
+                subtitle={`정산 기준월 ${tuitionMonth}`}
+            >
+                <div className="mb-6 flex flex-wrap items-end justify-between gap-3 rounded-xl bg-[#f8f8fa] px-5 py-4 border border-[#1d1d1f]/06">
+                    <div>
+                        <p className="text-[9px] font-bold tracking-[0.18em] text-[#86868b] uppercase">강사</p>
+                        <h2 className="text-xl font-bold text-[#1d1d1f] tracking-tight mt-1">{t.name}</h2>
+                    </div>
+                    <div className="text-right">
+                        <p className="text-[9px] font-bold tracking-[0.18em] text-[#86868b] uppercase">담당</p>
+                        <p className="text-[12px] font-semibold text-[#1d1d1f] mt-1">{t.subject || '미분류'}</p>
+                    </div>
                 </div>
-                <div className="mb-6 flex justify-between items-end"><h2 className="text-xl font-bold text-black">{t.name} 선생님</h2><p className="text-xs font-semibold text-gray-500">담당 파트: {t.subject}</p></div>
-                <table className="w-full text-xs text-left border-collapse border border-gray-300 mb-6">
-                    <thead><tr className="bg-gray-100 font-bold border-b border-gray-300"><th className="p-2 border-r border-gray-300">학생명(학교)</th><th className="p-2 border-r border-gray-300">강좌명</th><th className="p-2 border-r border-gray-300 text-center">회차(기준/실제)</th><th className="p-2 border-r border-gray-300 text-center">기본 수강료</th><th className="p-2 border-r border-gray-300 text-right">최종 정산액</th><th className="p-2 text-center w-32">비고</th></tr></thead>
+
+                <table className="w-full text-[11px] text-left border-collapse print-table mb-4">
+                    <thead>
+                        <tr>
+                            <th className="py-2.5 px-3 font-bold text-[#86868b] border-b border-[#1d1d1f]/15">학생명</th>
+                            <th className="py-2.5 px-3 font-bold text-[#86868b] border-b border-[#1d1d1f]/15">강좌명</th>
+                            <th className="py-2.5 px-3 font-bold text-[#86868b] border-b border-[#1d1d1f]/15 text-center">회차</th>
+                            <th className="py-2.5 px-3 font-bold text-[#86868b] border-b border-[#1d1d1f]/15 text-center">기본 수강료</th>
+                            <th className="py-2.5 px-3 font-bold text-[#86868b] border-b border-[#1d1d1f]/15 text-right">최종 정산액</th>
+                            <th className="py-2.5 px-3 font-bold text-[#86868b] border-b border-[#1d1d1f]/15 text-center w-28">비고</th>
+                        </tr>
+                    </thead>
                     <tbody>
-                        {details.length === 0 ? <tr><td colSpan="6" className="text-center p-6 text-gray-500">정산 내역이 없습니다.</td></tr> : 
-                        details.map(d => (
-                            <tr key={d.id} className="border-b border-gray-200">
-                                <td className="p-2 border-r border-gray-300 font-bold">{d.studentName}</td>
-                                <td className="p-2 border-r border-gray-300">{d.className}</td>
-                                <td className="p-2 border-r border-gray-300 text-center">{d.baseSessions} / {d.actualSessions}</td>
-                                <td className="p-2 border-r border-gray-300 text-center">{Number(d.basePrice).toLocaleString()}</td>
-                                <td className="p-2 border-r border-gray-300 text-right font-bold">{Number(d.finalPrice).toLocaleString()}원</td>
-                                <td className="p-2 text-[10px] text-gray-600 truncate">{d.reason}</td>
+                        {details.length === 0 ? (
+                            <tr><td colSpan="6" className="text-center p-10 text-[#86868b]">정산 내역이 없습니다.</td></tr>
+                        ) : details.map((d, rowIdx) => (
+                            <tr key={d.id} className={rowIdx % 2 === 0 ? 'bg-[#fafafa]' : 'bg-white'}>
+                                <td className="py-2.5 px-3 font-bold text-[#1d1d1f] border-b border-[#1d1d1f]/06">
+                                    {d.studentName}
+                                    {d.school ? <span className="text-[#86868b] font-medium ml-1">({d.school})</span> : null}
+                                </td>
+                                <td className="py-2.5 px-3 text-[#1d1d1f] border-b border-[#1d1d1f]/06">{d.className}</td>
+                                <td className="py-2.5 px-3 text-center text-[#1d1d1f] border-b border-[#1d1d1f]/06">{d.baseSessions} / {d.actualSessions}</td>
+                                <td className="py-2.5 px-3 text-center text-[#1d1d1f] border-b border-[#1d1d1f]/06">{Number(d.basePrice).toLocaleString()}</td>
+                                <td className="py-2.5 px-3 text-right font-bold text-[#1d1d1f] border-b border-[#1d1d1f]/06">{Number(d.finalPrice).toLocaleString()}원</td>
+                                <td className="py-2.5 px-3 text-[10px] text-[#636366] text-center border-b border-[#1d1d1f]/06 truncate">{d.reason || '—'}</td>
                             </tr>
                         ))}
                     </tbody>
-                    <tfoot><tr className="bg-gray-800 text-white font-bold text-sm"><td colSpan="4" className="p-3 text-center">총 정산액 (세전)</td><td colSpan="2" className="p-3 text-right">{totalAmount.toLocaleString()}원</td></tr></tfoot>
                 </table>
-            </div>
+
+                <div className="mt-6 flex items-center justify-between rounded-xl bg-[#1d1d1f] text-white px-5 py-4">
+                    <span className="text-[11px] font-bold tracking-[0.16em] uppercase opacity-80">총 정산액 (세전)</span>
+                    <span className="text-xl font-bold tracking-tight">{totalAmount.toLocaleString()}원</span>
+                </div>
+            </PrintDocument>
         );
     }
 
@@ -167,4 +201,3 @@ export const TuitionView = ({ currentUser, isInstructor, instructors, calcSettle
         </div>
     );
 };
-

@@ -25,11 +25,30 @@ input[type="number"]::-webkit-outer-spin-button {
 .nav-btn.active { background-color: #e8e8ed; color: #1d1d1f; font-weight: 600; }
 .nav-btn:hover:not(.active) { background-color: #ececec; }
 
+.print-doc {
+    box-sizing: border-box;
+    padding: 18mm 16mm;
+}
+
 @media print {
-    @page { size: A4 portrait; margin: 15mm 10mm; }
-    body { background-color: white !important; color: #000; letter-spacing: 0; }
+    @page { size: A4 portrait; margin: 12mm 10mm; }
+    body { background-color: white !important; color: #1a1a1a; letter-spacing: 0; }
     .no-print, aside, header { display: none !important; }
-    main { padding: 0 !important; overflow: visible !important; height: auto !important; margin-top: 0 !important; background: white !important; border: none !important;}
+    main { padding: 0 !important; overflow: visible !important; height: auto !important; margin-top: 0 !important; background: white !important; border: none !important; border-radius: 0 !important; box-shadow: none !important; }
     .print-container { width: 100% !important; max-width: none !important; border: none !important; box-shadow: none !important; margin: 0 !important; padding: 0 !important; }
-    .page-break-inside-avoid { page-break-inside: avoid; }
+    .page-break-inside-avoid { page-break-inside: avoid; break-inside: avoid; }
+    .print-doc {
+        padding: 0 !important;
+        max-width: none !important;
+        min-height: auto !important;
+        box-shadow: none !important;
+    }
+    .print-logo { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .print-table thead { display: table-header-group; }
+    .print-doc-header,
+    .print-doc-footer,
+    .print-doc-body [style] {
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
 }

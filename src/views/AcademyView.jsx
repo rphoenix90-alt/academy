@@ -25,6 +25,11 @@ export const AcademyView = ({ academyInfo, setAcademyInfo, instructors, openModa
                         
                         <div className="space-y-6">
                             <div className="text-center mb-8">
+                                {academyInfo.logoUrl ? (
+                                    <div className="w-20 h-20 mx-auto mb-4 rounded-2xl bg-white border border-[rgba(0,0,0,0.06)] overflow-hidden flex items-center justify-center shadow-sm">
+                                        <img src={academyInfo.logoUrl} alt="" className="w-full h-full object-contain p-1.5" />
+                                    </div>
+                                ) : null}
                                 <h2 className="text-2xl font-bold text-[#1d1d1f] tracking-tight">{academyInfo.name || '학원명 미설정'}</h2>
                             </div>
                             <div className="bg-[#f5f5f7] p-5 rounded-2xl space-y-3.5 text-[13px] font-medium">

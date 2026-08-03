@@ -60,6 +60,46 @@ export function getSubjectCardStyle(subject) {
     return SUBJECT_CARD_STYLES[subject] || SUBJECT_CARD_STYLES['기타'];
 }
 
+/** 학원 로고용 이미지 → 압축 data URL (Firestore 저장) */
+export function compressImageToDataUrl(file, { maxSide = 400, quality = 0.85 } = {}) {
+    return new Promise((resolve, reject) => {
+        if (!file || !file.type.startsWith('image/')) {
+            reject(new Error('이미지 파일만 업로드할 수 있습니다.'));
+            return;
+        }
+        if (file.size > 8 * 1024 * 1024) {
+            reject(new Error('이미지는 8MB 이하로 올려 주세요.'));
+            return;
+        }
+        const reader = new FileReader();
+        reader.onerror = () => reject(new Error('파일을 읽을 수 없습니다.'));
+        reader.onload = () => {
+            const img = new Image();
+            img.onerror = () => reject(new Error('이미지를 불러올 수 없습니다.'));
+            img.onload = () => {
+                const scale = Math.min(1, maxSide / Math.max(img.width, img.height));
+                const w = Math.max(1, Math.round(img.width * scale));
+                const h = Math.max(1, Math.round(img.height * scale));
+                const canvas = document.createElement('canvas');
+                canvas.width = w;
+                canvas.height = h;
+                const ctx = canvas.getContext('2d');
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(0, 0, w, h);
+                ctx.drawImage(img, 0, 0, w, h);
+                const dataUrl = canvas.toDataURL('image/jpeg', quality);
+                if (dataUrl.length > 700_000) {
+                    reject(new Error('이미지가 너무 큽니다. 더 작은 파일로 시도해 주세요.'));
+                    return;
+                }
+                resolve(dataUrl);
+            };
+            img.src = reader.result;
+        };
+        reader.readAsDataURL(file);
+    });
+}
+
 export function useLocalStorage(key, initialValue) {
     const [storedValue, setStoredValue] = useState(() => {
         try {
