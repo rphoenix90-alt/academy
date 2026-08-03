@@ -40,3 +40,4 @@ legacy/index.html      # 예전 단일 HTML (참고용)
 
 - [docs/SETUP-GITHUB-FIREBASE.md](docs/SETUP-GITHUB-FIREBASE.md)
 - [docs/DATA-MODEL.md](docs/DATA-MODEL.md)
+- [docs/AUTH-SETUP.md](docs/AUTH-SETUP.md) — 이메일 로그인 설정

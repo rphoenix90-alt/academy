@@ -87,9 +87,11 @@ export const AcademyView = ({ academyInfo, instructors, openModal, deleteItem, h
                                                                 <button onClick={() => deleteItem('instructor', t.id)} className="p-2 text-[#86868b] hover:text-[#ff3b30] transition-colors" title="삭제"><Trash2 size={12}/></button>
                                                             </div>
                                                         </div>
-                                                        <div className="bg-[#f5f5f7] rounded-xl p-3 text-[11px] font-medium text-[#86868b] flex justify-between border border-transparent">
-                                                            <span className="flex items-center gap-1.5"><Icon name="user" size={10}/> <span className="text-[#1d1d1f]">{t.phone}</span></span>
-                                                            <span className="flex items-center gap-1.5"><Icon name="key" size={10}/> <span className="text-[#1d1d1f]">{t.password || '미설정'}</span></span>
+                                                        <div className="bg-[#f5f5f7] rounded-xl p-3 text-[11px] font-medium text-[#86868b] flex justify-between border border-transparent gap-2">
+                                                            <span className="flex items-center gap-1.5 truncate"><Icon name="envelope" size={10}/> <span className="text-[#1d1d1f] truncate">{t.email || '이메일 미등록'}</span></span>
+                                                            <span className={`flex items-center gap-1.5 shrink-0 font-bold ${t.authUid ? 'text-[#008f5d]' : 'text-[#f5a623]'}`}>
+                                                              <Icon name="link" size={10}/> {t.authUid ? '연결됨' : '미연결'}
+                                                            </span>
                                                         </div>
                                                     </div>
                                                 ))}

@@ -19,6 +19,10 @@ export const textbookDoc = (db, id) => doc(db, 'academies', academyId, 'textbook
 export const memosDoc = (db) => doc(db, 'academies', academyId, 'meta', 'memos');
 export const settlementsDoc = (db) => doc(db, 'academies', academyId, 'meta', 'settlements');
 
+/** Auth UID → 역할 매핑 (Security Rules용) */
+export const membersCol = (db) => collection(db, 'academies', academyId, 'members');
+export const memberDoc = (db, uid) => doc(db, 'academies', academyId, 'members', uid);
+
 /** 예전 Gemini/단일 HTML 경로 (마이그레이션 원본) */
 export const LEGACY_APP_ID = import.meta.env.VITE_LEGACY_APP_ID || 'my-local-academy-app';
 

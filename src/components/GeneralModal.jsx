@@ -37,12 +37,16 @@ export const GeneralModal = ({
         
         try {
             if (type === 'instructor') {
-                obj.loginId = obj.phone; 
+                obj.email = (obj.email || '').trim().toLowerCase();
+                obj.loginId = obj.email || obj.phone;
+                delete obj.password;
                 const targetId = isEdit ? data.id : generateId();
-                if(isCloudActive) await setDoc(instructorDoc(db, targetId), {id: targetId, ...data, ...obj});
+                const payload = { id: targetId, ...(isEdit ? data : {}), ...obj };
+                delete payload.password;
+                if(isCloudActive) await setDoc(instructorDoc(db, targetId), payload);
                 else {
-                    if(isEdit) setInstructors(prev => prev.map(i => i.id === data.id ? {...i, ...obj} : i));
-                    else setInstructors(prev => [...prev, {id: targetId, ...obj}]);
+                    if(isEdit) setInstructors(prev => prev.map(i => i.id === data.id ? payload : i));
+                    else setInstructors(prev => [...prev, payload]);
                 }
             } 
             else if (type === 'student') {
@@ -160,9 +164,10 @@ export const GeneralModal = ({
                         {type === 'instructor' && <>
                             <div><label className={labelCls}>이름</label><input required name="name" defaultValue={data?.name} className={inputCls}/></div>
                             <div><label className={labelCls}>권한</label><select required name="role" defaultValue={data?.role || '강사'} className={inputCls}><option value="원장">원장</option><option value="관리자">관리자</option><option value="강사">강사</option></select></div>
-                            <div><label className={labelCls}>연락처 (ID)</label><input required name="phone" defaultValue={data?.phone} onInput={handlePhoneInput} placeholder="010-0000-0000" className={inputCls}/></div>
-                            <div><label className={labelCls}>비밀번호</label><input required name="password" defaultValue={data?.password || '1234'} type="text" className={inputCls}/></div>
+                            <div><label className={labelCls}>이메일 (로그인용)</label><input required type="email" name="email" defaultValue={data?.email} placeholder="teacher@example.com" className={inputCls}/></div>
+                            <div><label className={labelCls}>연락처</label><input name="phone" defaultValue={data?.phone} onInput={handlePhoneInput} placeholder="010-0000-0000" className={inputCls}/></div>
                             <div><label className={labelCls}>상태</label><select name="status" defaultValue={data?.status || '재직'} className={inputCls}><option>재직</option><option>휴직</option><option>퇴사</option></select></div>
+                            <p className="text-[11px] text-[#86868b] font-medium leading-relaxed">비밀번호는 저장하지 않습니다. 직원이 &quot;직원 계정 처음 연결하기&quot;에서 이메일로 직접 설정합니다.{data?.authUid ? ' (계정 연결됨)' : ' (아직 미연결)'}</p>
                         </>}
 
                         {type === 'academyEdit' && <>

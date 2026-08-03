@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { signInAnonymously, onAuthStateChanged } from 'firebase/auth';
+import { onAuthStateChanged } from 'firebase/auth';
 import { onSnapshot, setDoc, deleteDoc } from 'firebase/firestore';
 import * as XLSX from 'xlsx';
 import { auth, db, isCloudActive } from './firebase';
@@ -8,6 +8,10 @@ import {
   classesCol, classDoc, textbooksCol, textbookDoc, memosDoc, settlementsDoc,
 } from './lib/paths';
 import { migrateLegacyDataIfNeeded } from './lib/migrateLegacy';
+import {
+  loginWithEmail, logoutAuth, registerOwner, registerAndLinkStaff,
+  resolveCurrentUser, academyNeedsOwnerSetup,
+} from './lib/auth';
 import {
   triggerNotification, generateId, formatDate, useLocalStorage,
 } from './lib/utils';
@@ -39,8 +43,13 @@ export default function App() {
     const [currentUser, setCurrentUser] = useState(null);
     const [activeTab, setActiveTab] = useState('dashboard');
     
-    const [loginId, setLoginId] = useState('');
+    const [loginEmail, setLoginEmail] = useState('');
     const [loginPw, setLoginPw] = useState('');
+    const [registerName, setRegisterName] = useState('');
+    const [authMode, setAuthMode] = useState('login');
+    const [authBusy, setAuthBusy] = useState(false);
+    const [needsOwnerSetup, setNeedsOwnerSetup] = useState(false);
+    const [authReady, setAuthReady] = useState(false);
     const [isPrintMode, setIsPrintMode] = useState(false);
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [detailTab, setDetailTab] = useState('basic'); 
@@ -67,27 +76,55 @@ export default function App() {
     }, [currentUser]);
 
     useEffect(() => {
-        if (!auth) { setIsSyncing(false); return; }
-        const initAuth = async () => {
-            try {
-                await signInAnonymously(auth); 
-            } catch (e) {
-                console.error("Firebase auth Error:", e);
+        if (!auth) {
+            setIsSyncing(false);
+            setAuthReady(true);
+            return;
+        }
+        const unsubscribe = onAuthStateChanged(auth, async (user) => {
+            setFbUser(user);
+            if (!user) {
+                setCurrentUser(null);
                 setIsSyncing(false);
+                setAuthReady(true);
+                try {
+                    setNeedsOwnerSetup(await academyNeedsOwnerSetup());
+                } catch {
+                    setNeedsOwnerSetup(true);
+                }
+                return;
             }
-        };
-        initAuth();
-        const unsubscribe = onAuthStateChanged(auth, user => { setFbUser(user); if(!user) setIsSyncing(false); });
+            try {
+                const profile = await resolveCurrentUser(user);
+                if (profile) {
+                    setCurrentUser(profile);
+                    if (profile.role === '강사') setActiveTab((t) => (t === 'academy' ? 'dashboard' : t));
+                } else {
+                    setCurrentUser(null);
+                    triggerNotification('연결된 직원 정보가 없습니다. 계정 연결을 진행하세요.', true);
+                    await logoutAuth();
+                }
+            } catch (e) {
+                console.error(e);
+                setCurrentUser(null);
+            } finally {
+                setAuthReady(true);
+            }
+        });
         return () => unsubscribe();
     }, []);
 
     useEffect(() => {
-        if (!db || !fbUser) { setIsSyncing(false); return; }
+        if (!db || !fbUser || !currentUser) {
+            if (!fbUser) setIsSyncing(false);
+            return;
+        }
 
         let cancelled = false;
         let unsubscribers = [];
 
         const start = async () => {
+            setIsSyncing(true);
             try {
                 const result = await migrateLegacyDataIfNeeded(db);
                 if (result.migrated) {
@@ -115,7 +152,7 @@ export default function App() {
             cancelled = true;
             unsubscribers.forEach((u) => u && u());
         };
-    }, [db, fbUser]);
+    }, [db, fbUser, currentUser]);
 
     useEffect(() => {
         if (!currentUser || students.length === 0 || !academyInfo) return;
@@ -171,23 +208,65 @@ export default function App() {
         return students.filter(s => s.classIds && s.classIds.some(id => myClassIds.includes(id)));
     };
 
-    const handleLogin = (e) => {
-        e.preventDefault();
-        if (!loginId || !loginPw) return triggerNotification('정보를 모두 입력해주세요.', true);
-        const cleanInputId = loginId.replace(/-/g, '');
-        if (cleanInputId === '01038621442' && loginPw === '1057') {
-            setCurrentUser({ id: 'admin', role: '원장', name: 'Admin' });
-            triggerNotification('관리자 로그인');
-            return;
+    const handleLogin = async (e) => {
+        e?.preventDefault?.();
+        if (!loginEmail || !loginPw) return triggerNotification('이메일과 비밀번호를 입력해주세요.', true);
+        setAuthBusy(true);
+        try {
+            await loginWithEmail(loginEmail, loginPw);
+            triggerNotification('로그인되었습니다.');
+        } catch (err) {
+            console.error(err);
+            const msg = err?.code === 'auth/invalid-credential' || err?.code === 'auth/user-not-found' || err?.code === 'auth/wrong-password'
+                ? '이메일 또는 비밀번호가 올바르지 않습니다.'
+                : (err.message || '로그인에 실패했습니다.');
+            triggerNotification(msg, true);
+            throw err;
+        } finally {
+            setAuthBusy(false);
         }
-        const foundUser = instructors.find(t => (t.loginId === loginId || (t.phone && t.phone.replace(/-/g, '') === cleanInputId)) && t.password === loginPw);
-        if (foundUser) {
-            setCurrentUser({ id: foundUser.id, role: foundUser.role, name: foundUser.name });
-            if (foundUser.role === '강사' && activeTab === 'academy') setActiveTab('dashboard');
-            triggerNotification(`Welcome, ${foundUser.name}!`);
-        } else {
-            triggerNotification('정보가 일치하지 않습니다.', true);
+    };
+
+    const handleRegisterOwner = async (e) => {
+        e?.preventDefault?.();
+        if (!registerName || !loginEmail || !loginPw) return triggerNotification('이름, 이메일, 비밀번호를 입력해주세요.', true);
+        setAuthBusy(true);
+        try {
+            await registerOwner({ name: registerName, email: loginEmail, password: loginPw });
+            triggerNotification('원장 계정이 생성되었습니다.');
+            setAuthMode('login');
+        } catch (err) {
+            console.error(err);
+            triggerNotification(err.message || '계정 생성에 실패했습니다.', true);
+            throw err;
+        } finally {
+            setAuthBusy(false);
         }
+    };
+
+    const handleRegisterStaff = async (e) => {
+        e?.preventDefault?.();
+        if (!loginEmail || !loginPw) return triggerNotification('이메일과 비밀번호를 입력해주세요.', true);
+        setAuthBusy(true);
+        try {
+            await registerAndLinkStaff({ email: loginEmail, password: loginPw, name: registerName });
+            triggerNotification('직원 계정이 연결되었습니다.');
+            setAuthMode('login');
+        } catch (err) {
+            console.error(err);
+            triggerNotification(err.message || '계정 연결에 실패했습니다.', true);
+            throw err;
+        } finally {
+            setAuthBusy(false);
+        }
+    };
+
+    const handleLogout = async () => {
+        await logoutAuth();
+        setCurrentUser(null);
+        setLoginEmail('');
+        setLoginPw('');
+        setRegisterName('');
     };
 
     const handlePrint = () => { setIsPrintMode(true); setTimeout(() => { window.print(); setIsPrintMode(false); }, 300); };
@@ -374,7 +453,27 @@ export default function App() {
         else setSettlements(newSettlements);
     };
 
-    if (!currentUser) return <LoginView loginId={loginId} setLoginId={setLoginId} loginPw={loginPw} setLoginPw={setLoginPw} handleLogin={handleLogin} academyInfo={academyInfo} isSyncing={isSyncing} />;
+    if (!authReady || !currentUser) {
+        return (
+            <LoginView
+                mode={authMode}
+                setMode={setAuthMode}
+                loginEmail={loginEmail}
+                setLoginEmail={setLoginEmail}
+                loginPw={loginPw}
+                setLoginPw={setLoginPw}
+                registerName={registerName}
+                setRegisterName={setRegisterName}
+                handleLogin={handleLogin}
+                handleRegisterOwner={handleRegisterOwner}
+                handleRegisterStaff={handleRegisterStaff}
+                academyInfo={academyInfo}
+                isSyncing={isSyncing || !authReady}
+                authBusy={authBusy}
+                needsOwnerSetup={needsOwnerSetup}
+            />
+        );
+    }
 
     const navItems = [
         { id:'dashboard', name:'Dashboard', icon: LayoutDashboard, roles: ['원장', '관리자', '강사'] }, 
@@ -427,7 +526,7 @@ export default function App() {
                             <p className="text-[10px] text-[#86868b] font-bold uppercase tracking-widest mt-0.5">{currentUser.role}</p>
                         </div>
                     </div>
-                    <button onClick={() => {setCurrentUser(null); setLoginId(''); setLoginPw('');}} className="w-full text-[11px] py-2.5 bg-white hover:bg-[#e8e8ed] border border-[rgba(0,0,0,0.05)] text-[#1d1d1f] rounded-xl transition-colors font-bold uppercase tracking-widest shadow-sm">Sign Out</button>
+                    <button onClick={handleLogout} className="w-full text-[11px] py-2.5 bg-white hover:bg-[#e8e8ed] border border-[rgba(0,0,0,0.05)] text-[#1d1d1f] rounded-xl transition-colors font-bold uppercase tracking-widest shadow-sm">Sign Out</button>
                 </div>
             </aside>
 
