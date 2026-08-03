@@ -1,5 +1,8 @@
 import React, { useState } from 'react';
-import { doc, setDoc } from 'firebase/firestore';
+import { setDoc } from 'firebase/firestore';
+import {
+  academyDoc, instructorDoc, studentDoc, classDoc, textbookDoc,
+} from '../lib/paths';
 import {
   triggerNotification, generateId, formatDate, formatPhoneNumber, timeOptions,
   inputCls, labelCls, primaryBtnCls, secondaryBtnCls,
@@ -7,7 +10,7 @@ import {
 import { XIcon, Plus } from './Icons';
 
 export const GeneralModal = ({ 
-    modalState, closeModal, isCloudActive, db, appId, academyInfo, setAcademyInfo,
+    modalState, closeModal, isCloudActive, db, academyInfo, setAcademyInfo,
     instructors, setInstructors, students, setStudents, classes, setClasses,
     classSchedules, setClassSchedules, modalEnrolledStudents, setModalEnrolledStudents,
     modalStudentSearchTerm, setModalStudentSearchTerm, isWithdrawnStatus, setIsWithdrawnStatus,
@@ -36,7 +39,7 @@ export const GeneralModal = ({
             if (type === 'instructor') {
                 obj.loginId = obj.phone; 
                 const targetId = isEdit ? data.id : generateId();
-                if(isCloudActive) await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'instructors', targetId), {id: targetId, ...data, ...obj});
+                if(isCloudActive) await setDoc(instructorDoc(db, targetId), {id: targetId, ...data, ...obj});
                 else {
                     if(isEdit) setInstructors(prev => prev.map(i => i.id === data.id ? {...i, ...obj} : i));
                     else setInstructors(prev => [...prev, {id: targetId, ...obj}]);
@@ -51,7 +54,7 @@ export const GeneralModal = ({
                     obj.withdrawDate = '';
                 }
                 
-                if(isCloudActive) await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'students', targetId), {id: targetId, ...baseData, ...obj});
+                if(isCloudActive) await setDoc(studentDoc(db, targetId), {id: targetId, ...baseData, ...obj});
                 else {
                     if(isEdit) setStudents(prev => prev.map(i => i.id === data.id ? {...i, ...obj} : i));
                     else setStudents(prev => [...prev, {id: targetId, ...baseData, ...obj}]);
@@ -65,7 +68,7 @@ export const GeneralModal = ({
                 obj.time = classSchedules.map(s => `${s.days.join('/')} ${s.start}~${s.end}`).join('\n');
                 if (!obj.weeklySessions) obj.weeklySessions = classSchedules.reduce((acc, cur) => acc + cur.days.length, 0) || 1;
 
-                if(isCloudActive) await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'classes', targetId), {id: targetId, ...data, ...obj, teacherName});
+                if(isCloudActive) await setDoc(classDoc(db, targetId), {id: targetId, ...data, ...obj, teacherName});
                 else {
                     if(isEdit) setClasses(prev => prev.map(i => i.id === data.id ? {...i, ...obj, teacherName} : i));
                     else setClasses(prev => [...prev, {id: targetId, ...obj, teacherName}]);
@@ -84,7 +87,7 @@ export const GeneralModal = ({
                         const history = [...(std.classHistory || [])];
                         history.push({ id: generateId(), classId: targetId, className: classNameToSave, enrollDate: enrollDateToSave, dropDate: null });
                         const finalStd = { ...std, classIds: newClassIds, classHistory: history };
-                        if (isCloudActive) await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'students', sId), finalStd);
+                        if (isCloudActive) await setDoc(studentDoc(db, sId), finalStd);
                         else setStudents(prev => prev.map(s => s.id === sId ? finalStd : s));
                     }
                 }
@@ -102,17 +105,17 @@ export const GeneralModal = ({
                         else history.push({ id: generateId(), classId: targetId, className: classNameToSave, enrollDate: '이전', dropDate: formatDate(new Date()) });
 
                         const finalStd = { ...std, classIds: newClassIds, customClassTuition: newCustomClassTuition, classHistory: history };
-                        if (isCloudActive) await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'students', sId), finalStd);
+                        if (isCloudActive) await setDoc(studentDoc(db, sId), finalStd);
                         else setStudents(prev => prev.map(s => s.id === sId ? finalStd : s));
                     }
                 }
             } else if (type === 'academyEdit') {
                 const updatedAcademy = { ...academyInfo, ...obj };
-                if(isCloudActive) await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'academyInfo', 'main'), updatedAcademy);
+                if(isCloudActive) await setDoc(academyDoc(db), updatedAcademy);
                 else setAcademyInfo(updatedAcademy);
             } else if (type === 'textbook') {
                 const targetId = isEdit ? data.id : generateId();
-                if(isCloudActive) await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'textbooks', targetId), {id: targetId, ...data, ...obj});
+                if(isCloudActive) await setDoc(textbookDoc(db, targetId), {id: targetId, ...data, ...obj});
                 else {
                     if(isEdit) setTextbooks(prev => prev.map(i => i.id === data.id ? {...i, ...obj} : i));
                     else setTextbooks(prev => [...prev, {id: targetId, ...obj}]);

@@ -29,6 +29,8 @@ npm run build          # → dist/
 src/
   App.jsx              # 앱 전체 상태·화면 연결
   firebase.js          # Firebase 연결
+  lib/paths.js         # academies/{id}/... 경로
+  lib/migrateLegacy.js # 예전 데이터 자동 이전
   views/               # 대시보드, 학생, 클래스 등 화면
   components/          # 모달·아이콘
 legacy/index.html      # 예전 단일 HTML (참고용)
@@ -37,3 +39,4 @@ legacy/index.html      # 예전 단일 HTML (참고용)
 ## 문서
 
 - [docs/SETUP-GITHUB-FIREBASE.md](docs/SETUP-GITHUB-FIREBASE.md)
+- [docs/DATA-MODEL.md](docs/DATA-MODEL.md)

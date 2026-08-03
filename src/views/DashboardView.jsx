@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { doc, setDoc } from 'firebase/firestore';
-import { db, isCloudActive, appId } from '../firebase';
+import { setDoc } from 'firebase/firestore';
+import { db, isCloudActive } from '../firebase';
+import { memosDoc } from '../lib/paths';
 import { formatDate, getMonday, getWeekDates } from '../lib/utils';
 import { Icon, ChevronRight, ChevronLeft } from '../components/Icons';
 export const DashboardView = ({ currentUser, isInstructor, getMyStudents, calcTeacherStats, students, dashboardMemos, setDashboardMemos, adminMemoMode, setAdminMemoMode }) => {
@@ -153,7 +154,7 @@ export const DashboardView = ({ currentUser, isInstructor, getMyStudents, calcTe
                                     <textarea 
                                         value={dashboardMemos[memoKey] || ''} 
                                         onChange={(e) => setDashboardMemos({...dashboardMemos, [memoKey]: e.target.value})}
-                                        onBlur={async () => { if(isCloudActive) await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'memos', 'main'), dashboardMemos); }}
+                                        onBlur={async () => { if(isCloudActive) await setDoc(memosDoc(db), dashboardMemos); }}
                                         className={`flex-1 p-3 text-xs resize-none outline-none focus:ring-1 focus:ring-[#0066cc] rounded-xl transition-all duration-200 custom-scrollbar leading-relaxed font-medium ${isInstructor ? 'bg-[#f5f5f7] border border-transparent text-[#1d1d1f]' : (adminMemoMode === 'public' ? 'bg-[#f0f9ff]/50 text-[#0066cc] placeholder-[#0066cc]/40 border border-[#0066cc]/10' : 'bg-[#f5f5f7] border border-[rgba(0,0,0,0.05)] text-[#1d1d1f] hover:bg-white')}`}
                                         placeholder={isInstructor ? "내 일정..." : (adminMemoMode === 'public' ? "강사 공유 공지..." : "관리자 일정...")}
                                         spellCheck="false"

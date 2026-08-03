@@ -1,8 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { signInAnonymously, onAuthStateChanged } from 'firebase/auth';
-import { collection, onSnapshot, doc, setDoc, deleteDoc } from 'firebase/firestore';
+import { onSnapshot, setDoc, deleteDoc } from 'firebase/firestore';
 import * as XLSX from 'xlsx';
-import { auth, db, isCloudActive, appId } from './firebase';
+import { auth, db, isCloudActive } from './firebase';
+import {
+  academyDoc, instructorsCol, instructorDoc, studentsCol, studentDoc,
+  classesCol, classDoc, textbooksCol, textbookDoc, memosDoc, settlementsDoc,
+} from './lib/paths';
+import { migrateLegacyDataIfNeeded } from './lib/migrateLegacy';
 import {
   triggerNotification, generateId, formatDate, useLocalStorage,
 } from './lib/utils';
@@ -78,15 +83,38 @@ export default function App() {
 
     useEffect(() => {
         if (!db || !fbUser) { setIsSyncing(false); return; }
-        const unsubAcademy = onSnapshot(doc(db, 'artifacts', appId, 'public', 'data', 'academyInfo', 'main'), (snap) => { if(snap.exists()) setAcademyInfo(snap.data()); }, console.error);
-        const unsubInstructors = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'instructors'), (snap) => { const arr = []; snap.forEach(d => arr.push({id: d.id, ...d.data()})); setInstructors(arr); }, console.error);
-        const unsubStudents = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'students'), (snap) => { const arr = []; snap.forEach(d => arr.push({id: d.id, ...d.data()})); setStudents(arr); }, console.error);
-        const unsubClasses = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'classes'), (snap) => { const arr = []; snap.forEach(d => arr.push({id: d.id, ...d.data()})); setClasses(arr); }, console.error);
-        const unsubTextbooks = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'textbooks'), (snap) => { const arr = []; snap.forEach(d => arr.push({id: d.id, ...d.data()})); setTextbooks(arr); }, console.error);
-        const unsubMemos = onSnapshot(doc(db, 'artifacts', appId, 'public', 'data', 'memos', 'main'), (snap) => { if(snap.exists()) setDashboardMemos(snap.data()); }, console.error);
-        const unsubSettlements = onSnapshot(doc(db, 'artifacts', appId, 'public', 'data', 'settlements', 'main'), (snap) => { if(snap.exists()) setSettlements(snap.data()); }, console.error);
-        setIsSyncing(false);
-        return () => { unsubAcademy(); unsubInstructors(); unsubStudents(); unsubClasses(); unsubTextbooks(); unsubMemos(); unsubSettlements(); };
+
+        let cancelled = false;
+        let unsubscribers = [];
+
+        const start = async () => {
+            try {
+                const result = await migrateLegacyDataIfNeeded(db);
+                if (result.migrated) {
+                    triggerNotification(`데이터 이전 완료 (학생 ${result.counts.students}명 등)`);
+                }
+            } catch (e) {
+                console.error('Legacy migration failed:', e);
+            }
+            if (cancelled) return;
+
+            unsubscribers = [
+                onSnapshot(academyDoc(db), (snap) => { if (snap.exists()) setAcademyInfo(snap.data()); }, console.error),
+                onSnapshot(instructorsCol(db), (snap) => { const arr = []; snap.forEach(d => arr.push({ id: d.id, ...d.data() })); setInstructors(arr); }, console.error),
+                onSnapshot(studentsCol(db), (snap) => { const arr = []; snap.forEach(d => arr.push({ id: d.id, ...d.data() })); setStudents(arr); }, console.error),
+                onSnapshot(classesCol(db), (snap) => { const arr = []; snap.forEach(d => arr.push({ id: d.id, ...d.data() })); setClasses(arr); }, console.error),
+                onSnapshot(textbooksCol(db), (snap) => { const arr = []; snap.forEach(d => arr.push({ id: d.id, ...d.data() })); setTextbooks(arr); }, console.error),
+                onSnapshot(memosDoc(db), (snap) => { if (snap.exists()) setDashboardMemos(snap.data()); }, console.error),
+                onSnapshot(settlementsDoc(db), (snap) => { if (snap.exists()) setSettlements(snap.data()); }, console.error),
+            ];
+            setIsSyncing(false);
+        };
+
+        start();
+        return () => {
+            cancelled = true;
+            unsubscribers.forEach((u) => u && u());
+        };
     }, [db, fbUser]);
 
     useEffect(() => {
@@ -120,9 +148,9 @@ export default function App() {
                 const updatedAcademy = { ...academyInfo, lastPromotionYear: currentYear };
                 if (isCloudActive) {
                     try {
-                        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'academyInfo', 'main'), updatedAcademy);
+                        await setDoc(academyDoc(db), updatedAcademy);
                         for (const s of updatedStudents) {
-                            await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'students', s.id), s);
+                            await setDoc(studentDoc(db, s.id), s);
                         }
                         triggerNotification(`전체 원생 학년 자동 진급 완료`);
                     } catch(e) { console.error(e); }
@@ -134,7 +162,7 @@ export default function App() {
             };
             runPromotion();
         }
-    }, [currentUser, students, academyInfo, isCloudActive, db, appId]);
+    }, [currentUser, students, academyInfo, isCloudActive, db]);
 
     const getMyClasses = () => isInstructor ? classes.filter(c => c.teacherId === currentUser.id) : classes;
     const getMyStudents = () => {
@@ -184,32 +212,32 @@ export default function App() {
         if(!window.confirm('정말 삭제하시겠습니까?')) return;
         try {
             if(type === 'instructor') {
-                if(isCloudActive) await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'instructors', id));
+                if(isCloudActive) await deleteDoc(instructorDoc(db, id));
                 else setInstructors(prev => prev.filter(i => i.id !== id));
                 classes.forEach(async c => {
                     if (c.teacherId === id) {
-                        if(isCloudActive) await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'classes', c.id), {...c, teacherId: null, teacherName: '미정'});
+                        if(isCloudActive) await setDoc(classDoc(db, c.id), {...c, teacherId: null, teacherName: '미정'});
                         else setClasses(prev => prev.map(cl => cl.id === c.id ? {...cl, teacherId: null, teacherName: '미정'} : cl));
                     }
                 });
             }
             else if(type === 'student') {
-                if(isCloudActive) await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'students', id));
+                if(isCloudActive) await deleteDoc(studentDoc(db, id));
                 else setStudents(prev => prev.filter(i => i.id !== id));
             }
             else if(type === 'class') {
-                if(isCloudActive) await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'classes', id));
+                if(isCloudActive) await deleteDoc(classDoc(db, id));
                 else setClasses(prev => prev.filter(i => i.id !== id));
                 students.forEach(async s => {
                     if (s.classIds && s.classIds.includes(id)) {
                         const newClassIds = s.classIds.filter(cId => cId !== id);
-                        if(isCloudActive) await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'students', s.id), {...s, classIds: newClassIds});
+                        if(isCloudActive) await setDoc(studentDoc(db, s.id), {...s, classIds: newClassIds});
                         else setStudents(prev => prev.map(st => st.id === s.id ? {...st, classIds: newClassIds} : st));
                     }
                 });
             }
             else if(type === 'textbook') {
-                if(isCloudActive) await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'textbooks', id));
+                if(isCloudActive) await deleteDoc(textbookDoc(db, id));
                 else setTextbooks(prev => prev.filter(i => i.id !== id));
             }
             triggerNotification('삭제됨');
@@ -230,7 +258,7 @@ export default function App() {
                     school: row['학교'] || '', phone: row['학생연락처'] || '', parentPhone: row['학부모연락처'] || '', status: '재원',
                     enrollDate: formatDate(new Date()), classIds: [], grades: [], counseling: [], tuitionHistory: [], memo: '', classHistory: [], cashReceipt: ''
                 }));
-                if(isCloudActive) { for(const ns of newStudents) await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'students', ns.id), ns); } 
+                if(isCloudActive) { for(const ns of newStudents) await setDoc(studentDoc(db, ns.id), ns); } 
                 else setStudents(prev => [...prev, ...newStudents]);
                 triggerNotification(`${newStudents.length}건 업로드 완료`);
             } catch(err) { triggerNotification('업로드 오류', true); }
@@ -262,13 +290,13 @@ export default function App() {
             try {
                 const data = JSON.parse(evt.target.result);
                 if(isCloudActive) {
-                    if(data.academyInfo) await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'academyInfo', 'main'), data.academyInfo);
-                    if(data.instructors) for(const item of data.instructors) await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'instructors', item.id), item);
-                    if(data.students) for(const item of data.students) await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'students', item.id), item);
-                    if(data.classes) for(const item of data.classes) await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'classes', item.id), item);
-                    if(data.textbooks) for(const item of data.textbooks) await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'textbooks', item.id), item);
-                    if(data.dashboardMemos) await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'memos', 'main'), data.dashboardMemos);
-                    if(data.settlements) await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'settlements', 'main'), data.settlements);
+                    if(data.academyInfo) await setDoc(academyDoc(db), data.academyInfo);
+                    if(data.instructors) for(const item of data.instructors) await setDoc(instructorDoc(db, item.id), item);
+                    if(data.students) for(const item of data.students) await setDoc(studentDoc(db, item.id), item);
+                    if(data.classes) for(const item of data.classes) await setDoc(classDoc(db, item.id), item);
+                    if(data.textbooks) for(const item of data.textbooks) await setDoc(textbookDoc(db, item.id), item);
+                    if(data.dashboardMemos) await setDoc(memosDoc(db), data.dashboardMemos);
+                    if(data.settlements) await setDoc(settlementsDoc(db), data.settlements);
                     triggerNotification('Cloud 복원 완료');
                 } else {
                     if(data.academyInfo) setAcademyInfo(data.academyInfo);
@@ -336,13 +364,13 @@ export default function App() {
         if (!newSettlements[id]) newSettlements[id] = {};
         newSettlements[id].actualSessions = actualSessions;
         delete newSettlements[id].finalPrice;
-        if(isCloudActive) await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'settlements', 'main'), newSettlements);
+        if(isCloudActive) await setDoc(settlementsDoc(db), newSettlements);
         else setSettlements(newSettlements);
     };
 
     const handleSettlementChange = async (id, field, value) => {
         const newSettlements = {...settlements, [id]: {...(settlements[id]||{}), [field]: value}};
-        if(isCloudActive) await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'settlements', 'main'), newSettlements);
+        if(isCloudActive) await setDoc(settlementsDoc(db), newSettlements);
         else setSettlements(newSettlements);
     };
 
@@ -415,12 +443,12 @@ export default function App() {
             </main>
 
             {modalState.isOpen && modalState.type === 'studentDetail' && (
-                <StudentDetailModal stdId={modalState.data} students={students} classes={classes} currentUser={currentUser} isInstructor={isInstructor} isCloudActive={isCloudActive} db={db} appId={appId} setStudents={setStudents} closeModal={closeModal} openModal={openModal} detailTab={detailTab} setDetailTab={setDetailTab} />
-            )}
-            
-            {modalState.isOpen && modalState.type !== 'studentDetail' && (
-                <GeneralModal 
-                    modalState={modalState} closeModal={closeModal} isCloudActive={isCloudActive} db={db} appId={appId} 
+                <StudentDetailModal stdId={modalState.data} students={students} classes={classes} currentUser={currentUser} isInstructor={isInstructor} isCloudActive={isCloudActive} db={db} setStudents={setStudents} closeModal={closeModal} openModal={openModal} detailTab={detailTab} setDetailTab={setDetailTab} />
+                    )}
+                    
+                    {modalState.isOpen && modalState.type !== 'studentDetail' && (
+                        <GeneralModal 
+                            modalState={modalState} closeModal={closeModal} isCloudActive={isCloudActive} db={db} 
                     academyInfo={academyInfo} setAcademyInfo={setAcademyInfo} instructors={instructors} setInstructors={setInstructors} 
                     students={students} setStudents={setStudents} classes={classes} setClasses={setClasses} classSchedules={classSchedules} 
                     setClassSchedules={setClassSchedules} modalEnrolledStudents={modalEnrolledStudents} setModalEnrolledStudents={setModalEnrolledStudents} 

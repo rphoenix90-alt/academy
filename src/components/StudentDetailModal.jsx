@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { doc, setDoc } from 'firebase/firestore';
+import { setDoc } from 'firebase/firestore';
+import { studentDoc } from '../lib/paths';
 import {
   triggerNotification, generateId, formatDate, inputCls, labelCls, subtleBtnCls,
 } from '../lib/utils';
@@ -42,7 +43,7 @@ function ScoreGraph({ data, title, color }) {
 };
 
 
-export const StudentDetailModal = ({ stdId, students, classes, currentUser, isInstructor, isCloudActive, db, appId, setStudents, closeModal, openModal, detailTab, setDetailTab }) => {
+export const StudentDetailModal = ({ stdId, students, classes, currentUser, isInstructor, isCloudActive, db, setStudents, closeModal, openModal, detailTab, setDetailTab }) => {
     const [isClassManageOpen, setIsClassManageOpen] = useState(false);
     const [expandedTuitionId, setExpandedTuitionId] = useState(null);
     const [editingTuition, setEditingTuition] = useState(null);
@@ -63,7 +64,7 @@ export const StudentDetailModal = ({ stdId, students, classes, currentUser, isIn
         const fd = new FormData(e.target);
         const newGrade = { id: generateId(), date: fd.get('date'), examType: fd.get('examType'), exam: fd.get('exam'), score: fd.get('score'), rating: fd.get('rating') };
         const updatedStudent = {...std, grades: [...(std.grades||[]), newGrade]};
-        if(isCloudActive) await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'students', std.id), updatedStudent);
+        if(isCloudActive) await setDoc(studentDoc(db, std.id), updatedStudent);
         else setStudents(prev => prev.map(s => s.id === std.id ? updatedStudent : s));
         e.target.reset();
         triggerNotification('성적이 등록되었습니다.');
@@ -74,7 +75,7 @@ export const StudentDetailModal = ({ stdId, students, classes, currentUser, isIn
         const fd = new FormData(e.target);
         const newRecord = { id: generateId(), date: fd.get('date'), content: fd.get('content'), author: currentUser.name };
         const updatedStudent = {...std, counseling: [...(std.counseling||[]), newRecord]};
-        if(isCloudActive) await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'students', std.id), updatedStudent);
+        if(isCloudActive) await setDoc(studentDoc(db, std.id), updatedStudent);
         else setStudents(prev => prev.map(s => s.id === std.id ? updatedStudent : s));
         e.target.reset();
         triggerNotification('상담 이력이 등록되었습니다.');
@@ -93,7 +94,7 @@ export const StudentDetailModal = ({ stdId, students, classes, currentUser, isIn
             updatedTuitionHistory = [...(std.tuitionHistory||[]), {id: generateId(), ...tData}];
         }
         const updatedStudent = {...std, tuitionHistory: updatedTuitionHistory};
-        if(isCloudActive) await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'students', std.id), updatedStudent);
+        if(isCloudActive) await setDoc(studentDoc(db, std.id), updatedStudent);
         else setStudents(prev => prev.map(s => s.id === std.id ? updatedStudent : s));
         triggerNotification(editingTuition ? '수납 내역이 수정되었습니다.' : '수납 내역이 추가되었습니다.');
         e.target.reset();
@@ -103,7 +104,7 @@ export const StudentDetailModal = ({ stdId, students, classes, currentUser, isIn
         const memoVal = document.getElementById('studentMemo').value;
         const cashReceiptVal = document.getElementById('studentCashReceipt').value; 
         const updatedStudent = {...std, memo: memoVal, cashReceipt: cashReceiptVal};
-        if(isCloudActive) await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'students', std.id), updatedStudent);
+        if(isCloudActive) await setDoc(studentDoc(db, std.id), updatedStudent);
         else setStudents(prev => prev.map(s => s.id === std.id ? updatedStudent : s));
         triggerNotification('정보가 저장되었습니다.');
     };
@@ -111,7 +112,7 @@ export const StudentDetailModal = ({ stdId, students, classes, currentUser, isIn
     const deleteRecord = async (recordType, rId) => {
         if(!window.confirm('기록을 삭제하시겠습니까?')) return;
         const updatedStudent = {...std, [recordType]: std[recordType].filter(r => r.id !== rId)};
-        if(isCloudActive) await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'students', std.id), updatedStudent);
+        if(isCloudActive) await setDoc(studentDoc(db, std.id), updatedStudent);
         else setStudents(prev => prev.map(s => s.id === std.id ? updatedStudent : s));
     };
     
@@ -122,7 +123,7 @@ export const StudentDetailModal = ({ stdId, students, classes, currentUser, isIn
         if (activeIndex !== -1) {
             history[activeIndex].enrollDate = newDate;
             const updatedStudent = { ...std, classHistory: history };
-            if (isCloudActive) await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'students', std.id), updatedStudent);
+            if (isCloudActive) await setDoc(studentDoc(db, std.id), updatedStudent);
             else setStudents(prev => prev.map(s => s.id === std.id ? updatedStudent : s));
         }
     };
@@ -133,7 +134,7 @@ export const StudentDetailModal = ({ stdId, students, classes, currentUser, isIn
         if (idx !== -1) {
             history[idx][field] = value;
             const updatedStudent = { ...std, classHistory: history };
-            if (isCloudActive) await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'students', std.id), updatedStudent);
+            if (isCloudActive) await setDoc(studentDoc(db, std.id), updatedStudent);
             else setStudents(prev => prev.map(s => s.id === std.id ? updatedStudent : s));
         }
     };
@@ -160,7 +161,7 @@ export const StudentDetailModal = ({ stdId, students, classes, currentUser, isIn
         }
 
         const updatedStudent = { ...std, classIds: newClassIds, customClassTuition: newCustomClassTuition, classHistory: history };
-        if(isCloudActive) await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'students', std.id), updatedStudent);
+        if(isCloudActive) await setDoc(studentDoc(db, std.id), updatedStudent);
         else setStudents(prev => prev.map(s => s.id === std.id ? updatedStudent : s));
     };
 
@@ -424,7 +425,7 @@ export const StudentDetailModal = ({ stdId, students, classes, currentUser, isIn
                                                                         if (newPrice !== currentPrice) {
                                                                             const updatedCustom = { ...(std.customClassTuition || {}), [c.id]: newPrice };
                                                                             const updatedStudent = { ...std, customClassTuition: updatedCustom };
-                                                                            if(isCloudActive) await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'students', std.id), updatedStudent);
+                                                                            if(isCloudActive) await setDoc(studentDoc(db, std.id), updatedStudent);
                                                                             else setStudents(prev => prev.map(s => s.id === std.id ? updatedStudent : s));
                                                                             triggerNotification(`수강료가 변경되었습니다.`);
                                                                         }
