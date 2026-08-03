@@ -41,3 +41,7 @@ coverage/
 .npm
 .eslintcache
 .dataconnect
+
+# Firebase CLI noise
+firepit-log.txt
+firebase-debug.log*
