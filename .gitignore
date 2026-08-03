@@ -1,0 +1,43 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+firebase-debug.log*
+firebase-debug.*.log*
+pnpm-debug.log*
+
+# Dependencies
+node_modules/
+
+# Build
+dist/
+build/
+.vite/
+
+# Environment / secrets
+.env
+.env.local
+.env.*.local
+!.env.example
+*-firebase-adminsdk-*.json
+service-account*.json
+firebase-service-account.json
+
+# Firebase
+.firebase/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# Coverage / cache
+coverage/
+.nyc_output/
+.npm
+.eslintcache
+.dataconnect
