@@ -28,9 +28,10 @@ npm run build          # → dist/
 ```text
 src/
   App.jsx              # 앱 전체 상태·화면 연결
+  registry.js          # 선택 모듈 목록·ON/OFF
+  modules/             # 시간표·정산·성적 등 모듈
   firebase.js          # Firebase 연결
   lib/paths.js         # academies/{id}/... 경로
-  lib/migrateLegacy.js # 예전 데이터 자동 이전
   views/               # 대시보드, 학생, 클래스 등 화면
   components/          # 모달·아이콘
 legacy/index.html      # 예전 단일 HTML (참고용)
@@ -38,6 +39,8 @@ legacy/index.html      # 예전 단일 HTML (참고용)
 
 ## 문서
 
-- [docs/SETUP-GITHUB-FIREBASE.md](docs/SETUP-GITHUB-FIREBASE.md)
-- [docs/DATA-MODEL.md](docs/DATA-MODEL.md)
+- [docs/OPS.md](docs/OPS.md) — **일상 운영 가이드** (계정·모듈·백업·배포)
+- [docs/AUTH-SETUP.md](docs/AUTH-SETUP.md) — 로그인·원장/직원 계정
 - [docs/MODULES.md](docs/MODULES.md) — 기능 모듈 켜고 끄기
+- [docs/DATA-MODEL.md](docs/DATA-MODEL.md)
+- [docs/SETUP-GITHUB-FIREBASE.md](docs/SETUP-GITHUB-FIREBASE.md)

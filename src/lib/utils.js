@@ -9,9 +9,14 @@ export const subtleBtnCls = "bg-white border border-[rgba(0,0,0,0.05)] text-[#1d
 export const triggerNotification = (message, isError = false) => {
     const el = document.createElement('div');
     el.className = `fixed top-6 left-1/2 -translate-x-1/2 text-white px-6 py-3.5 rounded-full shadow-lg z-[100] transition-all duration-300 flex items-center gap-2.5 no-print font-medium text-sm apple-glass border-none ${isError ? 'bg-rose-500/90' : 'bg-[#1d1d1f]/90'}`;
-    el.innerHTML = `<i class="fas ${isError ? 'fa-exclamation-circle' : 'fa-check-circle'} ${isError ? 'text-white' : 'text-blue-400'}"></i> <span>${message}</span>`;
+    const icon = document.createElement('i');
+    icon.className = `fas ${isError ? 'fa-exclamation-circle text-white' : 'fa-check-circle text-blue-400'}`;
+    const text = document.createElement('span');
+    text.textContent = message;
+    el.appendChild(icon);
+    el.appendChild(text);
     document.body.appendChild(el);
-    setTimeout(() => { el.style.opacity = '0'; el.style.transform = 'translate(-50%, -20px)'; setTimeout(() => document.body.removeChild(el), 300); }, 3000);
+    setTimeout(() => { el.style.opacity = '0'; el.style.transform = 'translate(-50%, -20px)'; setTimeout(() => { if (el.parentNode) el.parentNode.removeChild(el); }, 300); }, 3000);
 };
 
 export const generateId = () => Math.random().toString(36).substr(2, 9);

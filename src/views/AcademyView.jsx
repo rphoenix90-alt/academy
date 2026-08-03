@@ -37,9 +37,12 @@ export const AcademyView = ({ academyInfo, setAcademyInfo, instructors, openModa
                         
                         <div className="mt-10 pt-8 border-t border-[rgba(0,0,0,0.05)]">
                             <h4 className="text-[11px] font-semibold text-[#86868b] uppercase tracking-widest mb-4">Data Backup</h4>
+                            <p className="text-[11px] text-[#86868b] font-medium mb-4 leading-relaxed">
+                                주기적으로 백업을 받아 두면 실수·기기 교체 시에도 복구할 수 있습니다.
+                            </p>
                             <div className="flex flex-col gap-2.5">
                                 <button onClick={handleBackupData} className="w-full bg-[#1d1d1f] hover:bg-black text-white font-medium py-3 rounded-xl transition-all flex justify-center items-center gap-2 text-[13px] shadow-sm"><Download size={14}/> 전체 백업 다운로드</button>
-                                <input type="file" accept=".json" ref={backupInputRef} onChange={handleRestoreData} className="hidden" />
+                                <input type="file" accept=".json,application/json" ref={backupInputRef} onChange={handleRestoreData} className="hidden" />
                                 <button onClick={() => backupInputRef.current.click()} className="w-full bg-[#f5f5f7] hover:bg-[#e8e8ed] text-[#1d1d1f] font-medium py-3 rounded-xl transition-all flex justify-center items-center gap-2 text-[13px]"><Upload size={14}/> 백업 파일 복원</button>
                             </div>
                         </div>

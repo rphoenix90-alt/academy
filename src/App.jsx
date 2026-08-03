@@ -331,8 +331,8 @@ export default function App() {
                 if(isCloudActive) await deleteDoc(textbookDoc(db, id));
                 else setTextbooks(prev => prev.filter(i => i.id !== id));
             }
-            triggerNotification('삭제됨');
-        } catch(e) { triggerNotification('오류 발생', true); }
+            triggerNotification('삭제했습니다.');
+        } catch(e) { triggerNotification('삭제에 실패했습니다. 잠시 후 다시 시도해 주세요.', true); }
     };
 
     const handleExcelUpload = async (e) => {
@@ -351,8 +351,8 @@ export default function App() {
                 }));
                 if(isCloudActive) { for(const ns of newStudents) await setDoc(studentDoc(db, ns.id), ns); } 
                 else setStudents(prev => [...prev, ...newStudents]);
-                triggerNotification(`${newStudents.length}건 업로드 완료`);
-            } catch(err) { triggerNotification('업로드 오류', true); }
+                triggerNotification(`학생 ${newStudents.length}명을 등록했습니다.`);
+            } catch(err) { triggerNotification('엑셀 파일을 읽을 수 없습니다. 양식을 확인해 주세요.', true); }
             e.target.value = null;
         };
         reader.readAsBinaryString(file);
@@ -365,21 +365,34 @@ export default function App() {
     };
 
     const handleBackupData = () => {
-        const backupData = { academyInfo, instructors, students, classes, dashboardMemos, settlements, textbooks };
+        const backupData = {
+            version: 1,
+            exportedAt: new Date().toISOString(),
+            academyInfo, instructors, students, classes, dashboardMemos, settlements, textbooks,
+        };
         const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
-        const a = document.createElement('a'); a.href = url; a.download = `Backup_${formatDate(new Date())}.json`;
+        const a = document.createElement('a'); a.href = url; a.download = `LinkWorks_Backup_${formatDate(new Date())}.json`;
         document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
-        triggerNotification('다운로드 됨');
+        triggerNotification('백업 파일을 다운로드했습니다.');
     };
 
     const handleRestoreData = async (e) => {
         const file = e.target.files[0];
         if(!file) return;
+        if (!window.confirm('백업 파일로 현재 데이터를 덮어쓸까요?\n복원 전 최신 백업을 받아 두는 것을 권장합니다.')) {
+            e.target.value = null;
+            return;
+        }
         const reader = new FileReader();
         reader.onload = async (evt) => {
             try {
                 const data = JSON.parse(evt.target.result);
+                if (!data || (!data.students && !data.classes && !data.academyInfo && !data.instructors)) {
+                    triggerNotification('올바른 백업 파일이 아닙니다.', true);
+                    e.target.value = null;
+                    return;
+                }
                 if(isCloudActive) {
                     if(data.academyInfo) await setDoc(academyDoc(db), data.academyInfo);
                     if(data.instructors) for(const item of data.instructors) await setDoc(instructorDoc(db, item.id), item);
@@ -388,7 +401,7 @@ export default function App() {
                     if(data.textbooks) for(const item of data.textbooks) await setDoc(textbookDoc(db, item.id), item);
                     if(data.dashboardMemos) await setDoc(memosDoc(db), data.dashboardMemos);
                     if(data.settlements) await setDoc(settlementsDoc(db), data.settlements);
-                    triggerNotification('Cloud 복원 완료');
+                    triggerNotification('클라우드 데이터를 복원했습니다.');
                 } else {
                     if(data.academyInfo) setAcademyInfo(data.academyInfo);
                     if(data.instructors) setInstructors(data.instructors);
@@ -397,9 +410,9 @@ export default function App() {
                     if(data.textbooks) setTextbooks(data.textbooks);
                     if(data.dashboardMemos) setDashboardMemos(data.dashboardMemos);
                     if(data.settlements) setSettlements(data.settlements);
-                    triggerNotification('Local 복원 완료');
+                    triggerNotification('로컬 데이터를 복원했습니다.');
                 }
-            } catch(err) { triggerNotification('파일 오류', true); }
+            } catch(err) { triggerNotification('백업 파일을 읽을 수 없습니다.', true); }
             e.target.value = null;
         };
         reader.readAsText(file);
