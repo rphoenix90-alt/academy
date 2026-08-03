@@ -109,10 +109,13 @@ export const LoginView = ({
               이미 계정이 있나요? 로그인
             </button>
           )}
-          {mode === 'login' && needsOwnerSetup && (
+          {mode === 'login' && (
             <button type="button" className="text-[#0066cc] hover:underline block w-full" onClick={() => setMode('owner')}>
               최초 원장 계정 만들기
             </button>
+          )}
+          {mode === 'login' && needsOwnerSetup && (
+            <p className="text-[11px] text-[#f5a623] font-semibold">아직 원장 계정이 없습니다. 위에서 먼저 만들어 주세요.</p>
           )}
           {mode === 'login' && (
             <button type="button" className="text-[#0066cc] hover:underline block w-full" onClick={() => setMode('staff')}>

@@ -10,7 +10,7 @@ import {
 import { migrateLegacyDataIfNeeded } from './lib/migrateLegacy';
 import {
   loginWithEmail, logoutAuth, registerOwner, registerAndLinkStaff,
-  resolveCurrentUser, academyNeedsOwnerSetup,
+  resolveCurrentUser, academyNeedsOwnerSetup, authSetupInProgress, mapAuthError,
 } from './lib/auth';
 import {
   triggerNotification, generateId, formatDate, useLocalStorage,
@@ -94,6 +94,11 @@ export default function App() {
                 }
                 return;
             }
+            // 가입 처리 중이면 Firestore 기록이 끝날 때까지 기다림
+            if (authSetupInProgress) {
+                setAuthReady(true);
+                return;
+            }
             try {
                 const profile = await resolveCurrentUser(user);
                 if (profile) {
@@ -101,12 +106,15 @@ export default function App() {
                     if (profile.role === '강사') setActiveTab((t) => (t === 'academy' ? 'dashboard' : t));
                 } else {
                     setCurrentUser(null);
-                    triggerNotification('연결된 직원 정보가 없습니다. 계정 연결을 진행하세요.', true);
+                    triggerNotification('연결된 직원 정보가 없습니다. 아래 「직원 계정 처음 연결하기」를 이용해 주세요.', true);
                     await logoutAuth();
                 }
             } catch (e) {
                 console.error(e);
-                setCurrentUser(null);
+                if (!authSetupInProgress) {
+                    setCurrentUser(null);
+                    triggerNotification(mapAuthError(e), true);
+                }
             } finally {
                 setAuthReady(true);
             }
@@ -217,11 +225,9 @@ export default function App() {
             triggerNotification('로그인되었습니다.');
         } catch (err) {
             console.error(err);
-            const msg = err?.code === 'auth/invalid-credential' || err?.code === 'auth/user-not-found' || err?.code === 'auth/wrong-password'
-                ? '이메일 또는 비밀번호가 올바르지 않습니다.'
-                : (err.message || '로그인에 실패했습니다.');
+            const msg = mapAuthError(err);
             triggerNotification(msg, true);
-            throw err;
+            throw Object.assign(err, { message: msg });
         } finally {
             setAuthBusy(false);
         }
@@ -232,13 +238,16 @@ export default function App() {
         if (!registerName || !loginEmail || !loginPw) return triggerNotification('이름, 이메일, 비밀번호를 입력해주세요.', true);
         setAuthBusy(true);
         try {
-            await registerOwner({ name: registerName, email: loginEmail, password: loginPw });
+            const { profile } = await registerOwner({ name: registerName, email: loginEmail, password: loginPw });
+            setCurrentUser(profile);
+            setNeedsOwnerSetup(false);
             triggerNotification('원장 계정이 생성되었습니다.');
             setAuthMode('login');
         } catch (err) {
             console.error(err);
-            triggerNotification(err.message || '계정 생성에 실패했습니다.', true);
-            throw err;
+            const msg = err.friendlyMessage || mapAuthError(err);
+            triggerNotification(msg, true);
+            throw Object.assign(err, { message: msg });
         } finally {
             setAuthBusy(false);
         }
@@ -249,13 +258,15 @@ export default function App() {
         if (!loginEmail || !loginPw) return triggerNotification('이메일과 비밀번호를 입력해주세요.', true);
         setAuthBusy(true);
         try {
-            await registerAndLinkStaff({ email: loginEmail, password: loginPw, name: registerName });
+            const { profile } = await registerAndLinkStaff({ email: loginEmail, password: loginPw, name: registerName });
+            setCurrentUser(profile);
             triggerNotification('직원 계정이 연결되었습니다.');
             setAuthMode('login');
         } catch (err) {
             console.error(err);
-            triggerNotification(err.message || '계정 연결에 실패했습니다.', true);
-            throw err;
+            const msg = err.friendlyMessage || mapAuthError(err);
+            triggerNotification(msg, true);
+            throw Object.assign(err, { message: msg });
         } finally {
             setAuthBusy(false);
         }

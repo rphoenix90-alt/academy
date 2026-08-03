@@ -32,7 +32,8 @@ service cloud.firestore {
     function isUnclaimed(academyId) {
       return !exists(academyPath(academyId))
         || !('ownerUid' in academyData(academyId))
-        || academyData(academyId).ownerUid == null;
+        || academyData(academyId).ownerUid == null
+        || academyData(academyId).ownerUid == '';
     }
 
     match /academies/{academyId} {
