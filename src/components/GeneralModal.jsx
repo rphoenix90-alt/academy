@@ -7,6 +7,7 @@ import {
   triggerNotification, generateId, formatDate, formatPhoneNumber, timeOptions,
   inputCls, labelCls, primaryBtnCls, secondaryBtnCls,
 } from '../lib/utils';
+import { normalizePhoneDigits } from '../lib/auth';
 import { XIcon, Plus } from './Icons';
 
 export const GeneralModal = ({ 
@@ -38,7 +39,11 @@ export const GeneralModal = ({
         try {
             if (type === 'instructor') {
                 obj.email = (obj.email || '').trim().toLowerCase();
-                obj.loginId = obj.email || obj.phone;
+                obj.phoneDigits = normalizePhoneDigits(obj.phone);
+                if (!obj.phoneDigits || obj.phoneDigits.length < 10) {
+                    return triggerNotification('로그인용 전화번호를 정확히 입력해 주세요.', true);
+                }
+                obj.loginId = obj.phone || obj.email;
                 delete obj.password;
                 const targetId = isEdit ? data.id : generateId();
                 const payload = { id: targetId, ...(isEdit ? data : {}), ...obj };
@@ -164,10 +169,13 @@ export const GeneralModal = ({
                         {type === 'instructor' && <>
                             <div><label className={labelCls}>이름</label><input required name="name" defaultValue={data?.name} className={inputCls}/></div>
                             <div><label className={labelCls}>권한</label><select required name="role" defaultValue={data?.role || '강사'} className={inputCls}><option value="원장">원장</option><option value="관리자">관리자</option><option value="강사">강사</option></select></div>
-                            <div><label className={labelCls}>이메일 (로그인용)</label><input required type="email" name="email" defaultValue={data?.email} placeholder="teacher@example.com" className={inputCls}/></div>
-                            <div><label className={labelCls}>연락처</label><input name="phone" defaultValue={data?.phone} onInput={handlePhoneInput} placeholder="010-0000-0000" className={inputCls}/></div>
+                            <div><label className={labelCls}>연락처 (로그인용)</label><input required name="phone" defaultValue={data?.phone} onInput={handlePhoneInput} placeholder="010-0000-0000" className={inputCls}/></div>
+                            <div><label className={labelCls}>이메일 (선택)</label><input type="email" name="email" defaultValue={data?.email} placeholder="선택 입력" className={inputCls}/></div>
                             <div><label className={labelCls}>상태</label><select name="status" defaultValue={data?.status || '재직'} className={inputCls}><option>재직</option><option>휴직</option><option>퇴사</option></select></div>
-                            <p className="text-[11px] text-[#86868b] font-medium leading-relaxed">비밀번호는 저장하지 않습니다. 직원이 &quot;직원 계정 처음 연결하기&quot;에서 이메일로 직접 설정합니다.{data?.authUid ? ' (계정 연결됨)' : ' (아직 미연결)'}</p>
+                            <p className="text-[11px] text-[#86868b] font-medium leading-relaxed">
+                              원장을 제외한 직원은 전화번호로 로그인합니다. 최초 비밀번호는 전화번호 뒤 4자리이며, 첫 로그인 시 새 비밀번호(4자리)를 설정합니다.
+                              {data?.authUid ? ' (계정 연결됨)' : ' (아직 미연결)'}
+                            </p>
                         </>}
 
                         {type === 'academyEdit' && <>

@@ -22,13 +22,13 @@ export const MODULE_CATALOG = [
     id: 'timetable',
     name: '종합 시간표',
     description: '주간/과목별 시간표 조회와 인쇄',
-    nav: { id: 'timetable', name: 'Timetable', icon: CalendarDays, roles: ['원장', '관리자', '강사'] },
+    nav: { id: 'timetable', name: 'Timetable', nameKo: '시간표', icon: CalendarDays, roles: ['원장', '관리자', '강사'] },
   },
   {
     id: 'settlement',
     name: '강사 정산',
     description: '강사별 강의료 정산 및 명세서',
-    nav: { id: 'tuition', name: 'Settlement', icon: CreditCard, roles: ['원장', '관리자', '강사'] },
+    nav: { id: 'tuition', name: 'Settlement', nameKo: '강사 정산', icon: CreditCard, roles: ['원장', '관리자', '강사'] },
   },
   {
     id: 'grades',

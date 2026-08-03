@@ -46,6 +46,20 @@ export const formatPhoneNumber = (value) => {
     return `${value.substr(0, 3)}-${value.substr(3, 4)}-${value.substr(7, 4)}`;
 };
 
+/** 수능 답안지 계열의 연한 과목 색 */
+export const SUBJECT_CARD_STYLES = {
+    '국어': { bg: '#FFF3E8', border: '#F0A86B', accent: '#E67E22', badge: 'bg-[#F0A86B]/20 text-[#B35C12]' },
+    '수학': { bg: '#EAF7EE', border: '#7BC48C', accent: '#2E9B57', badge: 'bg-[#7BC48C]/25 text-[#1F7A3F]' },
+    '영어': { bg: '#F3ECFA', border: '#B08CD4', accent: '#8E5BB8', badge: 'bg-[#B08CD4]/25 text-[#6B3D94]' },
+    '과학': { bg: '#FDE8EE', border: '#E890A4', accent: '#D45B75', badge: 'bg-[#E890A4]/25 text-[#A83D55]' },
+    '사회': { bg: '#E8F1FB', border: '#7BA8D9', accent: '#3D7AB8', badge: 'bg-[#7BA8D9]/25 text-[#2A5F94]' },
+    '기타': { bg: '#F4F4F6', border: '#C7C7CC', accent: '#8E8E93', badge: 'bg-[#C7C7CC]/40 text-[#636366]' },
+};
+
+export function getSubjectCardStyle(subject) {
+    return SUBJECT_CARD_STYLES[subject] || SUBJECT_CARD_STYLES['기타'];
+}
+
 export function useLocalStorage(key, initialValue) {
     const [storedValue, setStoredValue] = useState(() => {
         try {

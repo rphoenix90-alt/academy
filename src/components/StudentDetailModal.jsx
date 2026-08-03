@@ -44,21 +44,63 @@ function ScoreGraph({ data, title, color }) {
 };
 
 
-export const StudentDetailModal = ({ stdId, students, classes, currentUser, isInstructor, isCloudActive, db, setStudents, closeModal, openModal, detailTab, setDetailTab, academyInfo }) => {
+export const StudentDetailModal = ({ stdId, students, classes, textbooks = [], currentUser, isInstructor, isCloudActive, db, setStudents, closeModal, openModal, detailTab, setDetailTab, academyInfo }) => {
     const [isClassManageOpen, setIsClassManageOpen] = useState(false);
     const [expandedTuitionId, setExpandedTuitionId] = useState(null);
     const [editingTuition, setEditingTuition] = useState(null);
     const [editingClassTuitionId, setEditingClassTuitionId] = useState(null);
+    const [selectedTextbookId, setSelectedTextbookId] = useState('');
 
     const std = students.find(s => s.id === stdId);
     if (!std) return null;
     
     const stdClasses = (std.classIds || []).map(cId => classes.find(c=>c.id===cId)).filter(Boolean);
-    const totalExpected = stdClasses.reduce((sum, c) => {
+    const assignedTextbooks = std.assignedTextbooks || [];
+    const classTuitionTotal = stdClasses.reduce((sum, c) => {
         const customPrice = std.customClassTuition?.[c.id];
         const price = customPrice !== undefined && customPrice !== '' ? Number(customPrice) : Number(c.price || 0);
         return sum + price;
     }, 0);
+    const textbookTotal = assignedTextbooks.reduce((sum, t) => sum + Number(t.price || 0), 0);
+    const totalExpected = classTuitionTotal + textbookTotal;
+
+    const availableTextbooks = textbooks.filter(
+        (t) => !assignedTextbooks.some((a) => a.textbookId === t.id)
+    );
+
+    const handleAddTextbook = async () => {
+        if (!selectedTextbookId) return triggerNotification('추가할 교재를 선택해 주세요.', true);
+        const book = textbooks.find((t) => t.id === selectedTextbookId);
+        if (!book) return;
+        const entry = {
+            id: generateId(),
+            textbookId: book.id,
+            name: book.name,
+            subject: book.subject || '',
+            publisher: book.publisher || '',
+            price: Number(book.price || 0),
+            addedAt: formatDate(new Date()),
+        };
+        const updatedStudent = {
+            ...std,
+            assignedTextbooks: [...assignedTextbooks, entry],
+        };
+        if (isCloudActive) await setDoc(studentDoc(db, std.id), updatedStudent);
+        else setStudents((prev) => prev.map((s) => (s.id === std.id ? updatedStudent : s)));
+        setSelectedTextbookId('');
+        triggerNotification('교재가 추가되었습니다.');
+    };
+
+    const handleRemoveTextbook = async (entryId) => {
+        if (!window.confirm('이 교재를 수강료에서 제거할까요?')) return;
+        const updatedStudent = {
+            ...std,
+            assignedTextbooks: assignedTextbooks.filter((t) => t.id !== entryId),
+        };
+        if (isCloudActive) await setDoc(studentDoc(db, std.id), updatedStudent);
+        else setStudents((prev) => prev.map((s) => (s.id === std.id ? updatedStudent : s)));
+        triggerNotification('교재를 제거했습니다.');
+    };
 
     const handleAddGrade = async (e) => {
         e.preventDefault();
@@ -178,7 +220,7 @@ export const StudentDetailModal = ({ stdId, students, classes, currentUser, isIn
                     <div className="w-full lg:w-[260px] bg-[#f5f5f7] border-b lg:border-r border-[rgba(0,0,0,0.05)] flex flex-col custom-scrollbar shrink-0">
                         <div className="p-8 text-center border-b border-[rgba(0,0,0,0.05)] hidden lg:block">
                             <div className={`w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl shadow-sm border-[3px] border-white ${std.gender === '여' ? 'bg-[#fff0f0] text-[#ff3b30]' : 'bg-[#f0f9ff] text-[#0066cc]'}`}><UserIcon size={28}/></div>
-                            <h4 className={`text-xl font-bold mb-1 tracking-tight ${std.gender === '여' ? 'text-[#ff3b30]' : 'text-[#1d1d1f]'}`}>{std.name}</h4>
+                            <h4 className="text-xl font-bold mb-1 tracking-tight text-[#1d1d1f]">{std.name}</h4>
                             <p className="text-[11px] font-semibold text-[#86868b] mb-4">{std.school} {std.grade && `(${std.grade})`}</p>
                             <span className={"text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-wider shadow-sm border border-[rgba(0,0,0,0.02)] " + (std.status==='재원' ? 'bg-[#e5fcf1] text-[#008f5d]' : (std.status === '퇴원' ? 'bg-[#fff0f0] text-[#ff3b30]' : 'bg-white text-[#86868b]'))}>{std.status}</span>
                         </div>
@@ -186,7 +228,7 @@ export const StudentDetailModal = ({ stdId, students, classes, currentUser, isIn
                             <div className="flex items-center gap-3">
                                 <div className={`w-10 h-10 rounded-full flex items-center justify-center text-lg shadow-sm border-2 border-white ${std.gender === '여' ? 'bg-[#fff0f0] text-[#ff3b30]' : 'bg-[#f0f9ff] text-[#0066cc]'}`}><UserIcon size={16}/></div>
                                 <div>
-                                    <h4 className={`text-base font-bold tracking-tight ${std.gender === '여' ? 'text-[#ff3b30]' : 'text-[#1d1d1f]'}`}>{std.name}</h4>
+                                    <h4 className="text-base font-bold tracking-tight text-[#1d1d1f]">{std.name}</h4>
                                     <p className="text-[10px] font-semibold text-[#86868b]">{std.school} {std.grade && `(${std.grade})`}</p>
                                 </div>
                             </div>
@@ -467,8 +509,58 @@ export const StudentDetailModal = ({ stdId, students, classes, currentUser, isIn
                                             })
                                         )}
                                     </div>
+                                    <div className="mt-6 pt-5 border-t border-[rgba(0,0,0,0.05)]">
+                                        <h5 className="font-semibold text-[13px] text-[#1d1d1f] mb-4 flex items-center gap-2">
+                                            <span className="w-2 h-2 rounded-full bg-[#8E5BB8]"></span> 교재
+                                        </h5>
+                                        <div className="space-y-2 mb-4">
+                                            {assignedTextbooks.length === 0 ? (
+                                                <p className="text-[12px] font-medium text-[#86868b] text-center py-4 bg-[#f5f5f7] rounded-xl">추가된 교재가 없습니다.</p>
+                                            ) : (
+                                                assignedTextbooks.map((t) => (
+                                                    <div key={t.id} className="flex justify-between items-center p-4 bg-[#f5f5f7]/50 rounded-xl border border-[rgba(0,0,0,0.02)] gap-3">
+                                                        <div className="min-w-0">
+                                                            <p className="text-[13px] font-semibold text-[#1d1d1f] truncate">
+                                                                {t.name}
+                                                                {t.subject ? <span className="text-[10px] font-medium text-[#86868b] ml-1.5">{t.subject}</span> : null}
+                                                            </p>
+                                                            <p className="text-[10px] font-medium text-[#86868b] mt-1">{t.publisher || '출판사 미상'} · {t.addedAt || ''}</p>
+                                                        </div>
+                                                        <div className="flex items-center gap-2 shrink-0">
+                                                            <span className="text-[14px] font-bold text-[#1d1d1f]">{Number(t.price).toLocaleString()}원</span>
+                                                            <button type="button" onClick={() => handleRemoveTextbook(t.id)} className="p-1.5 text-[#86868b] hover:text-[#ff3b30] transition-colors" title="제거"><Trash2 size={12}/></button>
+                                                        </div>
+                                                    </div>
+                                                ))
+                                            )}
+                                        </div>
+                                        <div className="flex flex-col sm:flex-row gap-2">
+                                            <select
+                                                value={selectedTextbookId}
+                                                onChange={(e) => setSelectedTextbookId(e.target.value)}
+                                                className={`${inputCls} flex-1`}
+                                            >
+                                                <option value="">교재 선택…</option>
+                                                {availableTextbooks.map((t) => (
+                                                    <option key={t.id} value={t.id}>
+                                                        [{t.subject || '기타'}] {t.name} ({Number(t.price || 0).toLocaleString()}원)
+                                                    </option>
+                                                ))}
+                                            </select>
+                                            <button type="button" onClick={handleAddTextbook} className="bg-[#1d1d1f] hover:bg-black text-white font-medium px-4 py-3 rounded-xl text-[12px] shadow-sm flex items-center justify-center gap-1.5 shrink-0">
+                                                <Plus size={12}/> 교재 추가
+                                            </button>
+                                        </div>
+                                        {textbooks.length === 0 && (
+                                            <p className="text-[11px] text-[#86868b] font-medium mt-2">클래스 → 교재 관리에서 교재를 먼저 등록하세요.</p>
+                                        )}
+                                    </div>
+
                                     <div className="mt-6 pt-5 border-t border-[rgba(0,0,0,0.05)] flex justify-between items-end">
-                                        <p className="text-[11px] font-bold text-[#86868b] uppercase tracking-widest">당월 예상 총액</p>
+                                        <div>
+                                            <p className="text-[11px] font-bold text-[#86868b] uppercase tracking-widest">당월 예상 총액</p>
+                                            <p className="text-[10px] text-[#86868b] font-medium mt-1">수강료 {classTuitionTotal.toLocaleString()}원 + 교재 {textbookTotal.toLocaleString()}원</p>
+                                        </div>
                                         <p className="text-2xl font-bold text-[#1d1d1f] tracking-tight">{totalExpected > 0 ? `${totalExpected.toLocaleString()}원` : '-'}</p>
                                     </div>
                                 </div>

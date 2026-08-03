@@ -95,7 +95,7 @@ export const AcademyView = ({ academyInfo, setAcademyInfo, instructors, openModa
                                                             </div>
                                                         </div>
                                                         <div className="bg-[#f5f5f7] rounded-xl p-3 text-[11px] font-medium text-[#86868b] flex justify-between border border-transparent gap-2">
-                                                            <span className="flex items-center gap-1.5 truncate"><Icon name="envelope" size={10}/> <span className="text-[#1d1d1f] truncate">{t.email || '이메일 미등록'}</span></span>
+                                                            <span className="flex items-center gap-1.5 truncate"><Icon name="phone" size={10}/> <span className="text-[#1d1d1f] truncate">{t.phone || '연락처 미등록'}</span></span>
                                                             <span className={`flex items-center gap-1.5 shrink-0 font-bold ${t.authUid ? 'text-[#008f5d]' : 'text-[#f5a623]'}`}>
                                                               <Icon name="link" size={10}/> {t.authUid ? '연결됨' : '미연결'}
                                                             </span>

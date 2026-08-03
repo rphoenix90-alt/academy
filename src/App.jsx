@@ -9,7 +9,7 @@ import {
 } from './lib/paths';
 import { migrateLegacyDataIfNeeded } from './lib/migrateLegacy';
 import {
-  loginWithEmail, logoutAuth, registerOwner, registerAndLinkStaff,
+  loginWithEmail, loginWithPhonePin, logoutAuth, registerOwner, changeStaffPin,
   resolveCurrentUser, academyNeedsOwnerSetup, authSetupInProgress, mapAuthError,
 } from './lib/auth';
 import {
@@ -18,7 +18,7 @@ import {
 import {
   Icon, LayoutDashboard, Users, BookOpen, Building, UserIcon,
 } from './components/Icons';
-import { LoginView } from './views/LoginView';
+import { LoginView, ForcePinChangeModal } from './views/LoginView';
 import { DashboardView } from './views/DashboardView';
 import { AcademyView } from './views/AcademyView';
 import { StudentsView } from './views/StudentsView';
@@ -45,10 +45,12 @@ export default function App() {
     const [activeTab, setActiveTab] = useState('dashboard');
     
     const [loginEmail, setLoginEmail] = useState('');
+    const [loginPhone, setLoginPhone] = useState('');
     const [loginPw, setLoginPw] = useState('');
     const [registerName, setRegisterName] = useState('');
     const [authMode, setAuthMode] = useState('login');
     const [authBusy, setAuthBusy] = useState(false);
+    const [pinBusy, setPinBusy] = useState(false);
     const [needsOwnerSetup, setNeedsOwnerSetup] = useState(false);
     const [authReady, setAuthReady] = useState(false);
     const [isPrintMode, setIsPrintMode] = useState(false);
@@ -219,6 +221,24 @@ export default function App() {
 
     const handleLogin = async (e) => {
         e?.preventDefault?.();
+        if (!loginPhone || !loginPw) return triggerNotification('전화번호와 비밀번호를 입력해주세요.', true);
+        setAuthBusy(true);
+        try {
+            const { profile } = await loginWithPhonePin(loginPhone, loginPw);
+            if (profile) setCurrentUser(profile);
+            triggerNotification(profile?.mustChangePassword ? '비밀번호를 설정해 주세요.' : '로그인되었습니다.');
+        } catch (err) {
+            console.error(err);
+            const msg = err.friendlyMessage || mapAuthError(err);
+            triggerNotification(msg, true);
+            throw Object.assign(err, { message: msg });
+        } finally {
+            setAuthBusy(false);
+        }
+    };
+
+    const handleOwnerLogin = async (e) => {
+        e?.preventDefault?.();
         if (!loginEmail || !loginPw) return triggerNotification('이메일과 비밀번호를 입력해주세요.', true);
         setAuthBusy(true);
         try {
@@ -254,22 +274,18 @@ export default function App() {
         }
     };
 
-    const handleRegisterStaff = async (e) => {
-        e?.preventDefault?.();
-        if (!loginEmail || !loginPw) return triggerNotification('이메일과 비밀번호를 입력해주세요.', true);
-        setAuthBusy(true);
+    const handleChangePin = async (pin, confirm) => {
+        setPinBusy(true);
         try {
-            const { profile } = await registerAndLinkStaff({ email: loginEmail, password: loginPw, name: registerName });
-            setCurrentUser(profile);
-            triggerNotification('직원 계정이 연결되었습니다.');
-            setAuthMode('login');
+            await changeStaffPin(pin, confirm);
+            setCurrentUser((prev) => (prev ? { ...prev, mustChangePassword: false } : prev));
+            triggerNotification('비밀번호가 설정되었습니다.');
         } catch (err) {
-            console.error(err);
             const msg = err.friendlyMessage || mapAuthError(err);
             triggerNotification(msg, true);
             throw Object.assign(err, { message: msg });
         } finally {
-            setAuthBusy(false);
+            setPinBusy(false);
         }
     };
 
@@ -277,6 +293,7 @@ export default function App() {
         await logoutAuth();
         setCurrentUser(null);
         setLoginEmail('');
+        setLoginPhone('');
         setLoginPw('');
         setRegisterName('');
     };
@@ -503,13 +520,15 @@ export default function App() {
                 setMode={setAuthMode}
                 loginEmail={loginEmail}
                 setLoginEmail={setLoginEmail}
+                loginPhone={loginPhone}
+                setLoginPhone={setLoginPhone}
                 loginPw={loginPw}
                 setLoginPw={setLoginPw}
                 registerName={registerName}
                 setRegisterName={setRegisterName}
                 handleLogin={handleLogin}
+                handleOwnerLogin={handleOwnerLogin}
                 handleRegisterOwner={handleRegisterOwner}
-                handleRegisterStaff={handleRegisterStaff}
                 academyInfo={academyInfo}
                 isSyncing={isSyncing || !authReady}
                 authBusy={authBusy}
@@ -519,10 +538,10 @@ export default function App() {
     }
 
     const coreNavItems = [
-        { id: 'dashboard', name: 'Dashboard', icon: LayoutDashboard, roles: ['원장', '관리자', '강사'] },
-        { id: 'academy', name: 'Academy', icon: Building, roles: ['원장', '관리자'] },
-        { id: 'students', name: 'Students', icon: Users, roles: ['원장', '관리자', '강사'] },
-        { id: 'classes', name: 'Classes', icon: BookOpen, roles: ['원장', '관리자', '강사'] },
+        { id: 'dashboard', name: 'Dashboard', nameKo: '대시보드', icon: LayoutDashboard, roles: ['원장', '관리자', '강사'] },
+        { id: 'academy', name: 'Academy', nameKo: '학원/직원', icon: Building, roles: ['원장', '관리자'] },
+        { id: 'students', name: 'Students', nameKo: '학생', icon: Users, roles: ['원장', '관리자', '강사'] },
+        { id: 'classes', name: 'Classes', nameKo: '클래스', icon: BookOpen, roles: ['원장', '관리자', '강사'] },
     ];
     const navItems = buildNavItems(academyInfo, coreNavItems);
     const visibleNavItems = navItems.filter((item) => item.roles.includes(currentUser.role));
@@ -530,6 +549,9 @@ export default function App() {
 
     return (
         <div className={"flex h-screen font-sans " + (isPrintMode ? 'print-mode bg-white' : 'bg-[#f5f5f7]')}>
+            {currentUser.mustChangePassword && (
+                <ForcePinChangeModal onSubmit={handleChangePin} busy={pinBusy} />
+            )}
             {!isSyncing && !isCloudActive && currentUser && (
                 <div className="absolute top-0 left-0 w-full bg-[#1d1d1f] text-[#f5f5f7] text-center py-2 text-[10px] font-bold no-print z-50 flex items-center justify-center gap-2 shadow-sm tracking-widest uppercase">
                     <i className="fas fa-database text-[#86868b]"></i> Running in Local Storage Mode
@@ -555,8 +577,14 @@ export default function App() {
 
                 <nav className="flex-1 mt-2 px-5 space-y-1.5 overflow-y-auto custom-scrollbar pb-6">
                     {visibleNavItems.map(item => (
-                        <button key={item.id} onClick={() => { setActiveTab(item.id); setIsSidebarOpen(false); }} className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-[14px] transition-all duration-300 nav-btn ${activeTab === item.id ? 'active' : 'text-[#86868b] font-medium'}`}>
-                            <item.icon /> {item.name}
+                        <button key={item.id} onClick={() => { setActiveTab(item.id); setIsSidebarOpen(false); }} className={`group w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-[14px] transition-all duration-300 nav-btn ${activeTab === item.id ? 'active' : 'text-[#86868b] font-medium'}`}>
+                            <item.icon />
+                            <span className="relative inline-flex min-h-[1.25em] items-center">
+                                <span className="transition-opacity duration-200 group-hover:opacity-0">{item.name}</span>
+                                <span className="absolute left-0 top-1/2 -translate-y-1/2 opacity-0 transition-opacity duration-200 group-hover:opacity-100 whitespace-nowrap">
+                                    {item.nameKo || item.name}
+                                </span>
+                            </span>
                         </button>
                     ))}
                 </nav>
@@ -585,7 +613,7 @@ export default function App() {
             </main>
 
             {modalState.isOpen && modalState.type === 'studentDetail' && (
-                <StudentDetailModal stdId={modalState.data} students={students} classes={classes} currentUser={currentUser} isInstructor={isInstructor} isCloudActive={isCloudActive} db={db} setStudents={setStudents} closeModal={closeModal} openModal={openModal} detailTab={detailTab} setDetailTab={setDetailTab} academyInfo={academyInfo} />
+                <StudentDetailModal stdId={modalState.data} students={students} classes={classes} textbooks={textbooks} currentUser={currentUser} isInstructor={isInstructor} isCloudActive={isCloudActive} db={db} setStudents={setStudents} closeModal={closeModal} openModal={openModal} detailTab={detailTab} setDetailTab={setDetailTab} academyInfo={academyInfo} />
                     )}
                     
                     {modalState.isOpen && modalState.type !== 'studentDetail' && (
