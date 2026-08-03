@@ -465,6 +465,24 @@ export default function App() {
         else setSettlements(newSettlements);
     };
 
+    useEffect(() => {
+        if (!currentUser) return;
+        const core = ['dashboard', 'academy', 'students', 'classes'];
+        const moduleNavIds = [];
+        if (isModuleEnabled(academyInfo, 'timetable')) moduleNavIds.push('timetable');
+        if (isModuleEnabled(academyInfo, 'settlement')) moduleNavIds.push('tuition');
+        const allowedByRole = {
+            dashboard: true,
+            academy: currentUser.role === '원장' || currentUser.role === '관리자',
+            students: true,
+            classes: true,
+            timetable: true,
+            tuition: true,
+        };
+        const allowed = [...core, ...moduleNavIds].filter((id) => allowedByRole[id]);
+        if (!allowed.includes(activeTab)) setActiveTab('dashboard');
+    }, [academyInfo?.enabledModules, currentUser, activeTab]);
+
     if (!authReady || !currentUser) {
         return (
             <LoginView
@@ -496,11 +514,6 @@ export default function App() {
     const navItems = buildNavItems(academyInfo, coreNavItems);
     const visibleNavItems = navItems.filter((item) => item.roles.includes(currentUser.role));
     const moduleFlags = getModuleFlags(academyInfo);
-
-    useEffect(() => {
-        const allowed = visibleNavItems.map((i) => i.id);
-        if (!allowed.includes(activeTab)) setActiveTab('dashboard');
-    }, [academyInfo?.enabledModules, currentUser?.role, activeTab]);
 
     return (
         <div className={"flex h-screen font-sans " + (isPrintMode ? 'print-mode bg-white' : 'bg-[#f5f5f7]')}>
