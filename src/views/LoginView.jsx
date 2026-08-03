@@ -35,8 +35,8 @@ export const LoginView = ({
     '원장이 등록한 이메일로 비밀번호를 설정합니다';
 
   return (
-    <div className="flex h-screen bg-[#f5f5f7] items-center justify-center font-sans relative p-4 sm:p-0">
-      <div className="bg-white p-10 sm:p-12 rounded-[2rem] apple-shadow border border-[rgba(0,0,0,0.05)] w-full max-w-[400px]">
+    <div className="min-h-screen bg-[#f5f5f7] flex items-start sm:items-center justify-center font-sans relative p-4 py-10 overflow-y-auto">
+      <div className="bg-white p-8 sm:p-12 rounded-[2rem] apple-shadow border border-[rgba(0,0,0,0.05)] w-full max-w-[400px] my-auto">
         <div className="text-center mb-8">
           <div className="w-16 h-16 bg-[#0066cc] rounded-2xl flex items-center justify-center mx-auto mb-5 shadow-sm relative">
             <Icon name="link" className="text-white text-2xl" />
@@ -49,6 +49,12 @@ export const LoginView = ({
           </p>
           <p className="text-sm font-bold text-[#1d1d1f] mt-4">{title}</p>
         </div>
+
+        {needsOwnerSetup && mode === 'login' && (
+          <div className="mb-5 rounded-2xl bg-[#fff8e6] border border-[#f5a623]/30 px-4 py-3 text-[12px] font-semibold text-[#8a5a00] leading-relaxed">
+            아직 원장 계정이 없습니다. 아래에서 <span className="text-[#1d1d1f]">「최초 원장 계정 만들기」</span>를 눌러 주세요.
+          </div>
+        )}
 
         <form onSubmit={onSubmit} className="space-y-4">
           {(mode === 'owner' || mode === 'staff') && (
@@ -103,27 +109,38 @@ export const LoginView = ({
           </button>
         </form>
 
-        <div className="mt-6 space-y-2 text-center text-[12px] font-medium text-[#86868b]">
-          {mode !== 'login' && (
-            <button type="button" className="text-[#0066cc] hover:underline block w-full" onClick={() => setMode('login')}>
-              이미 계정이 있나요? 로그인
-            </button>
-          )}
-          {mode === 'login' && (
-            <button type="button" className="text-[#0066cc] hover:underline block w-full" onClick={() => setMode('owner')}>
+        {mode === 'login' && (
+          <div className="mt-4 space-y-3">
+            <button
+              type="button"
+              onClick={() => { setMode('owner'); setLocalError(''); }}
+              className="w-full py-3.5 rounded-xl font-semibold text-[13px] bg-[#1d1d1f] text-white hover:bg-black transition-colors"
+            >
               최초 원장 계정 만들기
             </button>
-          )}
-          {mode === 'login' && needsOwnerSetup && (
-            <p className="text-[11px] text-[#f5a623] font-semibold">아직 원장 계정이 없습니다. 위에서 먼저 만들어 주세요.</p>
-          )}
-          {mode === 'login' && (
-            <button type="button" className="text-[#0066cc] hover:underline block w-full" onClick={() => setMode('staff')}>
+            <button
+              type="button"
+              onClick={() => { setMode('staff'); setLocalError(''); }}
+              className="w-full py-3 rounded-xl font-semibold text-[13px] bg-[#f5f5f7] text-[#1d1d1f] hover:bg-[#e8e8ed] transition-colors"
+            >
               직원 계정 처음 연결하기
             </button>
-          )}
-          <p className="pt-2 text-[11px]">비밀번호는 Firebase에만 저장되며, 화면에 표시되지 않습니다.</p>
-        </div>
+          </div>
+        )}
+
+        {mode !== 'login' && (
+          <button
+            type="button"
+            className="mt-5 w-full text-center text-[12px] font-semibold text-[#0066cc] hover:underline"
+            onClick={() => { setMode('login'); setLocalError(''); }}
+          >
+            이미 계정이 있나요? 로그인으로 돌아가기
+          </button>
+        )}
+
+        <p className="mt-6 text-center text-[11px] font-medium text-[#86868b]">
+          비밀번호는 Firebase에만 저장되며, 화면에 표시되지 않습니다.
+        </p>
       </div>
     </div>
   );
