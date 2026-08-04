@@ -25,10 +25,10 @@ academies/{academyId}/meta/settlements
 
 ## Firestore Rules 배포
 
-터미널에서 (Firebase 로그인 후):
+Hosting만 자동 배포됩니다. **Rules는 별도 배포**가 필요합니다.
 
 ```bash
 firebase deploy --only firestore:rules --project linkworks-hak
 ```
 
-Rules는 `firestore.rules`에 있습니다. 다음 단계(로그인 보안)에서 더 강화합니다.
+전화번호 직원 로그인은 Rules가 최신이어야 동작합니다.

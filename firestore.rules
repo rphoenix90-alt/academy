@@ -36,8 +36,21 @@ service cloud.firestore {
         || academyData(academyId).ownerUid == '';
     }
 
+    /** 전화번호 로그인용 Auth 이메일: p{digits}@staff.linkworks.local */
+    function phoneAuthEmailFromDigits(digits) {
+      return 'p' + digits + '@staff.linkworks.local';
+    }
+
+    function authEmailMatchesPhoneDigits(digits) {
+      return signedIn()
+        && digits is string
+        && digits.size() >= 10
+        && request.auth.token.email == phoneAuthEmailFromDigits(digits);
+    }
+
     match /academies/{academyId} {
-      allow read: if isMember(academyId)
+      // 학원 문서: 로그인 사용자는 읽기 가능(직원 연결 시 ownerUid 확인 등)
+      allow read: if signedIn()
         || isUnclaimed(academyId)
         || !exists(academyPath(academyId));
       allow create: if signedIn();
@@ -49,10 +62,19 @@ service cloud.firestore {
         allow create: if signedIn() && request.auth.uid == uid && (
           isUnclaimed(academyId)
           || (
-            request.resource.data.email == request.auth.token.email
-            && exists(/databases/$(database)/documents/academies/$(academyId)/instructors/$(request.resource.data.instructorId))
+            exists(/databases/$(database)/documents/academies/$(academyId)/instructors/$(request.resource.data.instructorId))
             && get(/databases/$(database)/documents/academies/$(academyId)/instructors/$(request.resource.data.instructorId)).data.authUid == request.auth.uid
-            && get(/databases/$(database)/documents/academies/$(academyId)/instructors/$(request.resource.data.instructorId)).data.email == request.auth.token.email
+            && (
+              // 이메일 연결(레거시)
+              (
+                request.resource.data.email == request.auth.token.email
+                && get(/databases/$(database)/documents/academies/$(academyId)/instructors/$(request.resource.data.instructorId)).data.email == request.auth.token.email
+              )
+              // 전화번호 연결
+              || authEmailMatchesPhoneDigits(
+                get(/databases/$(database)/documents/academies/$(academyId)/instructors/$(request.resource.data.instructorId)).data.phoneDigits
+              )
+            )
           )
         );
         allow update: if isAdmin(academyId) || (signedIn() && request.auth.uid == uid);
@@ -61,14 +83,26 @@ service cloud.firestore {
 
       match /instructors/{id} {
         allow read: if isMember(academyId)
-          || (signedIn() && resource.data.email == request.auth.token.email);
+          || (signedIn() && resource.data.email == request.auth.token.email)
+          || (signedIn() && resource.data.authUid == request.auth.uid)
+          // 전화번호 로그인: Auth 이메일이 p{phoneDigits}@... 와 일치하면 해당 직원만 조회
+          || authEmailMatchesPhoneDigits(resource.data.phoneDigits);
+
         allow create: if isAdmin(academyId)
           || (signedIn() && isUnclaimed(academyId));
+
         allow update: if isAdmin(academyId)
+          // 본인 계정 연결(최초): authUid 부여
           || (signedIn()
-              && resource.data.email == request.auth.token.email
-              && (!('authUid' in resource.data) || resource.data.authUid == null)
-              && request.resource.data.authUid == request.auth.uid);
+              && (!('authUid' in resource.data) || resource.data.authUid == null || resource.data.authUid == '')
+              && request.resource.data.authUid == request.auth.uid
+              && (
+                resource.data.email == request.auth.token.email
+                || authEmailMatchesPhoneDigits(resource.data.phoneDigits)
+              ))
+          // 이미 연결된 본인 문서 수정(비밀번호 변경 플래그 등)
+          || (signedIn() && resource.data.authUid == request.auth.uid);
+
         allow delete: if isAdmin(academyId);
       }
 

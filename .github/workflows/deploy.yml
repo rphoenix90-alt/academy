@@ -30,7 +30,7 @@ jobs:
       - name: Install Firebase CLI
         run: npm install -g firebase-tools
 
-      - name: Deploy to Firebase Hosting
-        run: firebase deploy --only hosting --project linkworks-hak --non-interactive
+      - name: Deploy to Firebase Hosting + Firestore Rules
+        run: firebase deploy --only hosting,firestore:rules --project linkworks-hak --non-interactive
         env:
           FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}

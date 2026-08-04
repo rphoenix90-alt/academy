@@ -94,18 +94,36 @@ function profileFromMember(m, fbUser) {
 }
 
 async function findInstructorByPhoneDigits(digits) {
-  const snap = await getDocs(instructorsCol(db));
-  const list = [];
-  snap.forEach((d) => list.push({ id: d.id, ...d.data() }));
-  return list.find((i) => {
-    const d = i.phoneDigits || normalizePhoneDigits(i.phone);
-    return d === digits;
-  }) || null;
+  // 로그인 후: phoneDigits 쿼리 (보안 규칙과 일치)
+  try {
+    const q = query(instructorsCol(db), where('phoneDigits', '==', digits));
+    const snap = await getDocs(q);
+    if (!snap.empty) {
+      const d = snap.docs[0];
+      return { id: d.id, ...d.data() };
+    }
+  } catch (_) { /* fall through */ }
+
+  // 규칙이 허용하는 범위에서만 추가 매칭 (phoneDigits 미설정 직원)
+  try {
+    const snap = await getDocs(instructorsCol(db));
+    const list = [];
+    snap.forEach((d) => list.push({ id: d.id, ...d.data() }));
+    return list.find((i) => {
+      const d = i.phoneDigits || normalizePhoneDigits(i.phone);
+      return d === digits;
+    }) || null;
+  } catch (_) {
+    return null;
+  }
 }
 
 /**
  * 강사·관리자: 전화번호 + 4자리 PIN 로그인
- * 최초: PIN = 전화번호 뒤 4자리 → 계정 생성 후 mustChangePassword
+ * 최초: PIN = 전화번호 뒤 4자리 → Auth 생성 후 직원 문서 연결
+ *
+ * 순서: Auth 로그인/생성 먼저 → (규칙상) 직원 조회 → members 연결
+ * (로그인 전에 instructors를 읽으면 permission-denied 가 납니다)
  */
 export async function loginWithPhonePin(phone, pin) {
   const digits = normalizePhoneDigits(phone);
@@ -122,79 +140,113 @@ export async function loginWithPhonePin(phone, pin) {
     throw err;
   }
 
-  const instructor = await findInstructorByPhoneDigits(digits);
-  if (!instructor) {
-    const err = new Error('등록된 직원이 없습니다. 원장/관리자에게 직원 등록(전화번호)을 요청하세요.');
-    err.friendlyMessage = err.message;
-    throw err;
-  }
-
-  const academySnap = await getDoc(academyDoc(db));
-  const academy = academySnap.exists() ? academySnap.data() : {};
-  if (instructor.authUid && academy.ownerUid && instructor.authUid === academy.ownerUid) {
-    const err = new Error('원장은 이메일로 로그인해 주세요.');
-    err.friendlyMessage = err.message;
-    throw err;
-  }
-  if (instructor.role === '원장' && academy.ownerUid && instructor.authUid === academy.ownerUid) {
-    const err = new Error('원장은 이메일로 로그인해 주세요.');
-    err.friendlyMessage = err.message;
-    throw err;
-  }
-
   const email = phoneAuthEmail(digits);
   const password = pinToAuthPassword(pinNorm);
+  const initialPin = last4OfPhone(digits);
 
   authSetupInProgress = true;
   try {
-    if (instructor.authUid) {
-      try {
-        await signInWithEmailAndPassword(auth, email, password);
-      } catch (err) {
-        // 예전 이메일 계정만 있는 경우 안내
-        if (instructor.email && !String(instructor.email).includes('@staff.linkworks.local')) {
-          const e = new Error('기존 이메일 계정입니다. 원장에게 직원 정보를 전화번호 로그인용으로 다시 등록·연결해 달라고 요청하세요.');
-          e.friendlyMessage = e.message;
-          throw e;
-        }
-        err.friendlyMessage = mapAuthError(err);
-        throw err;
+    let isNewAuthUser = false;
+
+    try {
+      await signInWithEmailAndPassword(auth, email, password);
+    } catch (signErr) {
+      const code = signErr?.code || '';
+      const canTryCreate =
+        code === 'auth/user-not-found'
+        || code === 'auth/invalid-credential'
+        || code === 'auth/wrong-password';
+
+      if (!canTryCreate) {
+        signErr.friendlyMessage = mapAuthError(signErr);
+        throw signErr;
       }
-    } else {
-      const initial = last4OfPhone(digits);
-      if (pinNorm !== initial) {
-        const err = new Error('최초 비밀번호는 전화번호 뒤 4자리입니다.');
+
+      // 최초 연결: 비밀번호는 전화번호 뒤 4자리만 허용
+      if (pinNorm !== initialPin) {
+        const err = new Error('전화번호 또는 비밀번호가 올바르지 않습니다. 최초 로그인 시 비밀번호는 전화번호 뒤 4자리입니다.');
         err.friendlyMessage = err.message;
         throw err;
       }
 
-      const cred = await createUserWithEmailAndPassword(auth, email, password);
-      const uid = cred.user.uid;
       try {
-        if (instructor.name) await updateProfile(cred.user, { displayName: instructor.name });
-      } catch (_) { /* ignore */ }
-
-      await updateDoc(instructorDoc(db, instructor.id), {
-        authUid: uid,
-        phoneDigits: digits,
-        phone: instructor.phone || phone,
-        mustChangePassword: true,
-        password: deleteField(),
-      });
-      await setDoc(memberDoc(db, uid), {
-        role: instructor.role || '강사',
-        instructorId: instructor.id,
-        name: instructor.name,
-        email,
-        phone: instructor.phone || phone,
-        phoneDigits: digits,
-        mustChangePassword: true,
-      });
+        const cred = await createUserWithEmailAndPassword(auth, email, password);
+        isNewAuthUser = true;
+        try {
+          await updateProfile(cred.user, { displayName: '직원' });
+        } catch (_) { /* ignore */ }
+      } catch (createErr) {
+        if (createErr?.code === 'auth/email-already-in-use') {
+          const err = new Error('비밀번호가 올바르지 않습니다.');
+          err.friendlyMessage = err.message;
+          throw err;
+        }
+        createErr.friendlyMessage = mapAuthError(createErr);
+        throw createErr;
+      }
     }
 
-    const fbUser = auth.currentUser;
-    const profile = await resolveCurrentUser(fbUser);
-    return { user: fbUser, profile };
+    const uid = auth.currentUser.uid;
+
+    // 이미 members 가 있으면 바로 프로필 반환
+    const existingMember = await getDoc(memberDoc(db, uid));
+    if (existingMember.exists()) {
+      const profile = await resolveCurrentUser(auth.currentUser);
+      return { user: auth.currentUser, profile };
+    }
+
+    // members 없음 → 직원 문서와 연결 (Auth 이메일 = p{phoneDigits}@...)
+    const instructor = await findInstructorByPhoneDigits(digits);
+    if (!instructor) {
+      if (isNewAuthUser) {
+        try { await auth.currentUser.delete(); } catch (_) { /* ignore */ }
+      } else {
+        await logoutAuth();
+      }
+      const err = new Error('등록된 직원이 없습니다. 원장/관리자에게 직원 등록(전화번호)을 요청하세요. 이미 등록된 직원이라면 Academy에서 직원 정보를 한 번 저장해 phoneDigits를 갱신해 주세요.');
+      err.friendlyMessage = err.message;
+      throw err;
+    }
+
+    const academySnap = await getDoc(academyDoc(db));
+    const academy = academySnap.exists() ? academySnap.data() : {};
+    if (academy.ownerUid && (instructor.authUid === academy.ownerUid || instructor.role === '원장' && academy.ownerUid === uid)) {
+      await logoutAuth();
+      const err = new Error('원장은 이메일로 로그인해 주세요.');
+      err.friendlyMessage = err.message;
+      throw err;
+    }
+
+    if (instructor.authUid && instructor.authUid !== uid) {
+      await logoutAuth();
+      const err = new Error('이미 다른 계정에 연결된 직원입니다. 원장에게 문의해 주세요.');
+      err.friendlyMessage = err.message;
+      throw err;
+    }
+
+    try {
+      if (instructor.name) await updateProfile(auth.currentUser, { displayName: instructor.name });
+    } catch (_) { /* ignore */ }
+
+    await updateDoc(instructorDoc(db, instructor.id), {
+      authUid: uid,
+      phoneDigits: digits,
+      phone: instructor.phone || phone,
+      mustChangePassword: true,
+      password: deleteField(),
+    });
+    await setDoc(memberDoc(db, uid), {
+      role: instructor.role || '강사',
+      instructorId: instructor.id,
+      name: instructor.name,
+      email,
+      phone: instructor.phone || phone,
+      phoneDigits: digits,
+      mustChangePassword: true,
+    });
+
+    const profile = await resolveCurrentUser(auth.currentUser);
+    return { user: auth.currentUser, profile };
   } catch (err) {
     if (!err.friendlyMessage) err.friendlyMessage = mapAuthError(err);
     throw err;
