@@ -17,8 +17,15 @@ service cloud.firestore {
       return get(memberPath(academyId)).data.role;
     }
 
+    /** TEMP: 하드코딩 관리자 이메일 — 작업 후 제거 */
+    function isBootstrapOwner() {
+      return signedIn()
+        && request.auth.token.email == 'rphoenix90@jubilee-p.com';
+    }
+
     function isAdmin(academyId) {
-      return isMember(academyId) && memberRole(academyId) in ['원장', '관리자'];
+      return isBootstrapOwner()
+        || (isMember(academyId) && memberRole(academyId) in ['원장', '관리자']);
     }
 
     function academyPath(academyId) {
@@ -36,6 +43,13 @@ service cloud.firestore {
         || academyData(academyId).ownerUid == '';
     }
 
+    /** ownerUid 는 있는데 members 가 없는 중도 실패 복구용 */
+    function isClaimedOwner(academyId) {
+      return signedIn()
+        && exists(academyPath(academyId))
+        && academyData(academyId).ownerUid == request.auth.uid;
+    }
+
     /** 전화번호 로그인용 Auth 이메일: p{digits}@staff.linkworks.local */
     function phoneAuthEmailFromDigits(digits) {
       return 'p' + digits + '@staff.linkworks.local';
@@ -49,18 +63,21 @@ service cloud.firestore {
     }
 
     match /academies/{academyId} {
-      // 학원 문서: 로그인 사용자는 읽기 가능(직원 연결 시 ownerUid 확인 등)
-      allow read: if signedIn()
-        || isUnclaimed(academyId)
-        || !exists(academyPath(academyId));
+      // 학원 문서: 로그인 전에도 ownerUid 유무(최초 설정 여부)를 확인해야 함
+      allow get: if true;
+      allow list: if signedIn();
       allow create: if signedIn();
       allow update: if isAdmin(academyId)
+        || isClaimedOwner(academyId)
+        || isBootstrapOwner()
         || (signedIn() && isUnclaimed(academyId) && request.resource.data.ownerUid == request.auth.uid);
 
       match /members/{uid} {
         allow read: if isMember(academyId) || (signedIn() && request.auth.uid == uid);
         allow create: if signedIn() && request.auth.uid == uid && (
           isUnclaimed(academyId)
+          || isClaimedOwner(academyId)
+          || isBootstrapOwner()
           || (
             exists(/databases/$(database)/documents/academies/$(academyId)/instructors/$(request.resource.data.instructorId))
             && get(/databases/$(database)/documents/academies/$(academyId)/instructors/$(request.resource.data.instructorId)).data.authUid == request.auth.uid
@@ -83,13 +100,16 @@ service cloud.firestore {
 
       match /instructors/{id} {
         allow read: if isMember(academyId)
+          || isBootstrapOwner()
           || (signedIn() && resource.data.email == request.auth.token.email)
           || (signedIn() && resource.data.authUid == request.auth.uid)
           // 전화번호 로그인: Auth 이메일이 p{phoneDigits}@... 와 일치하면 해당 직원만 조회
           || authEmailMatchesPhoneDigits(resource.data.phoneDigits);
 
         allow create: if isAdmin(academyId)
-          || (signedIn() && isUnclaimed(academyId));
+          || (signedIn() && isUnclaimed(academyId))
+          || isBootstrapOwner()
+          || (isClaimedOwner(academyId) && request.resource.data.authUid == request.auth.uid);
 
         allow update: if isAdmin(academyId)
           // 본인 계정 연결(최초): authUid 부여

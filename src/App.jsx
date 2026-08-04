@@ -9,8 +9,8 @@ import {
 } from './lib/paths';
 import { migrateLegacyDataIfNeeded } from './lib/migrateLegacy';
 import {
-  loginWithEmail, loginWithPhonePin, logoutAuth, registerOwner, changeStaffPin,
-  resolveCurrentUser, academyNeedsOwnerSetup, authSetupInProgress, mapAuthError,
+  resolveCurrentUser, authSetupInProgress, mapAuthError, ensureBootstrapAdmin,
+  BOOTSTRAP_ADMIN,
 } from './lib/auth';
 import {
   triggerNotification, generateId, formatDate, useLocalStorage,
@@ -18,7 +18,6 @@ import {
 import {
   Icon, LayoutDashboard, Users, BookOpen, Building, UserIcon,
 } from './components/Icons';
-import { LoginView, ForcePinChangeModal } from './views/LoginView';
 import { DashboardView } from './views/DashboardView';
 import { AcademyView } from './views/AcademyView';
 import { StudentsView } from './views/StudentsView';
@@ -28,6 +27,16 @@ import { TuitionView } from './modules/settlement';
 import { buildNavItems, getModuleFlags, isModuleEnabled } from './registry';
 import { StudentDetailModal } from './components/StudentDetailModal';
 import { GeneralModal } from './components/GeneralModal';
+
+/** 로그인 페이지 제거 기간용 — 클라우드 부트스트랩 실패 시에도 화면 작업 가능 */
+const LOCAL_ADMIN = {
+  id: 'local-admin',
+  role: '원장',
+  name: BOOTSTRAP_ADMIN.name,
+  email: BOOTSTRAP_ADMIN.email,
+  authUid: 'local-admin',
+  mustChangePassword: false,
+};
 
 export default function App() {
     const [fbUser, setFbUser] = useState(null);
@@ -43,20 +52,12 @@ export default function App() {
 
     const [currentUser, setCurrentUser] = useState(null);
     const [activeTab, setActiveTab] = useState('dashboard');
-    
-    const [loginEmail, setLoginEmail] = useState('');
-    const [loginPhone, setLoginPhone] = useState('');
-    const [loginPw, setLoginPw] = useState('');
-    const [registerName, setRegisterName] = useState('');
-    const [authMode, setAuthMode] = useState('login');
-    const [authBusy, setAuthBusy] = useState(false);
-    const [pinBusy, setPinBusy] = useState(false);
-    const [needsOwnerSetup, setNeedsOwnerSetup] = useState(false);
     const [authReady, setAuthReady] = useState(false);
+    const [bootError, setBootError] = useState('');
     const [isPrintMode, setIsPrintMode] = useState(false);
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [detailTab, setDetailTab] = useState('basic'); 
-    const [adminMemoMode, setAdminMemoMode] = useState('public');
+    const [adminMemoMode, setAdminMemoMode] = useState('private');
     const [modalState, setModalState] = useState({ isOpen: false, type: null, data: null });
     
     const [classSchedules, setClassSchedules] = useState([{ id: generateId(), days: [], start: '18:00', end: '20:00' }]);
@@ -68,56 +69,63 @@ export default function App() {
 
     const fileInputRef = useRef(null);
     const backupInputRef = useRef(null);
+    const bootstrappingRef = useRef(false);
 
     const isInstructor = currentUser?.role === '강사';
 
     useEffect(() => {
-        if (currentUser) {
-            if (currentUser.role === '원장' || currentUser.role === '관리자') setAdminMemoMode('private');
-            else setAdminMemoMode('public');
-        }
-    }, [currentUser]);
-
-    useEffect(() => {
         if (!auth) {
+            setCurrentUser(LOCAL_ADMIN);
             setIsSyncing(false);
             setAuthReady(true);
             return;
         }
+
         const unsubscribe = onAuthStateChanged(auth, async (user) => {
             setFbUser(user);
+
             if (!user) {
-                setCurrentUser(null);
-                setIsSyncing(false);
-                setAuthReady(true);
+                if (bootstrappingRef.current) {
+                    setAuthReady(true);
+                    return;
+                }
+                bootstrappingRef.current = true;
+                setBootError('');
                 try {
-                    setNeedsOwnerSetup(await academyNeedsOwnerSetup());
-                } catch {
-                    setNeedsOwnerSetup(true);
+                    const { profile } = await ensureBootstrapAdmin();
+                    if (profile) setCurrentUser({ ...profile, mustChangePassword: false });
+                } catch (e) {
+                    console.error(e);
+                    setBootError(e?.friendlyMessage || mapAuthError(e));
+                    setCurrentUser(LOCAL_ADMIN);
+                } finally {
+                    bootstrappingRef.current = false;
+                    setIsSyncing(false);
+                    setAuthReady(true);
                 }
                 return;
             }
-            // 가입 처리 중이면 Firestore 기록이 끝날 때까지 기다림
+
             if (authSetupInProgress) {
                 setAuthReady(true);
                 return;
             }
+
             try {
-                const profile = await resolveCurrentUser(user);
-                if (profile) {
-                    setCurrentUser(profile);
-                    if (profile.role === '강사') setActiveTab((t) => (t === 'academy' ? 'dashboard' : t));
-                } else {
-                    setCurrentUser(null);
-                    triggerNotification('연결된 직원 정보가 없습니다. 아래 「직원 계정 처음 연결하기」를 이용해 주세요.', true);
-                    await logoutAuth();
+                let profile = await resolveCurrentUser(user);
+                if (!profile) {
+                    const ensured = await ensureBootstrapAdmin();
+                    profile = ensured.profile;
                 }
+                setCurrentUser(profile
+                  ? { ...profile, mustChangePassword: false }
+                  : LOCAL_ADMIN);
+                if (profile?.role === '강사') setActiveTab((t) => (t === 'academy' ? 'dashboard' : t));
+                setBootError('');
             } catch (e) {
                 console.error(e);
-                if (!authSetupInProgress) {
-                    setCurrentUser(null);
-                    triggerNotification(mapAuthError(e), true);
-                }
+                setBootError(e?.friendlyMessage || mapAuthError(e));
+                setCurrentUser(LOCAL_ADMIN);
             } finally {
                 setAuthReady(true);
             }
@@ -126,7 +134,7 @@ export default function App() {
     }, []);
 
     useEffect(() => {
-        if (!db || !fbUser || !currentUser) {
+        if (!db || !fbUser || !currentUser || currentUser.id === 'local-admin') {
             if (!fbUser) setIsSyncing(false);
             return;
         }
@@ -217,85 +225,6 @@ export default function App() {
         if (!isInstructor) return students;
         const myClassIds = getMyClasses().map(c => c.id);
         return students.filter(s => s.classIds && s.classIds.some(id => myClassIds.includes(id)));
-    };
-
-    const handleLogin = async (e) => {
-        e?.preventDefault?.();
-        if (!loginPhone || !loginPw) return triggerNotification('전화번호와 비밀번호를 입력해주세요.', true);
-        setAuthBusy(true);
-        try {
-            const { profile } = await loginWithPhonePin(loginPhone, loginPw);
-            if (profile) setCurrentUser(profile);
-            triggerNotification(profile?.mustChangePassword ? '비밀번호를 설정해 주세요.' : '로그인되었습니다.');
-        } catch (err) {
-            console.error(err);
-            const msg = err.friendlyMessage || mapAuthError(err);
-            triggerNotification(msg, true);
-            throw Object.assign(err, { message: msg });
-        } finally {
-            setAuthBusy(false);
-        }
-    };
-
-    const handleOwnerLogin = async (e) => {
-        e?.preventDefault?.();
-        if (!loginEmail || !loginPw) return triggerNotification('이메일과 비밀번호를 입력해주세요.', true);
-        setAuthBusy(true);
-        try {
-            await loginWithEmail(loginEmail, loginPw);
-            triggerNotification('로그인되었습니다.');
-        } catch (err) {
-            console.error(err);
-            const msg = mapAuthError(err);
-            triggerNotification(msg, true);
-            throw Object.assign(err, { message: msg });
-        } finally {
-            setAuthBusy(false);
-        }
-    };
-
-    const handleRegisterOwner = async (e) => {
-        e?.preventDefault?.();
-        if (!registerName || !loginEmail || !loginPw) return triggerNotification('이름, 이메일, 비밀번호를 입력해주세요.', true);
-        setAuthBusy(true);
-        try {
-            const { profile } = await registerOwner({ name: registerName, email: loginEmail, password: loginPw });
-            setCurrentUser(profile);
-            setNeedsOwnerSetup(false);
-            triggerNotification('원장 계정이 생성되었습니다.');
-            setAuthMode('login');
-        } catch (err) {
-            console.error(err);
-            const msg = err.friendlyMessage || mapAuthError(err);
-            triggerNotification(msg, true);
-            throw Object.assign(err, { message: msg });
-        } finally {
-            setAuthBusy(false);
-        }
-    };
-
-    const handleChangePin = async (pin, confirm) => {
-        setPinBusy(true);
-        try {
-            await changeStaffPin(pin, confirm);
-            setCurrentUser((prev) => (prev ? { ...prev, mustChangePassword: false } : prev));
-            triggerNotification('비밀번호가 설정되었습니다.');
-        } catch (err) {
-            const msg = err.friendlyMessage || mapAuthError(err);
-            triggerNotification(msg, true);
-            throw Object.assign(err, { message: msg });
-        } finally {
-            setPinBusy(false);
-        }
-    };
-
-    const handleLogout = async () => {
-        await logoutAuth();
-        setCurrentUser(null);
-        setLoginEmail('');
-        setLoginPhone('');
-        setLoginPw('');
-        setRegisterName('');
     };
 
     const handlePrint = () => { setIsPrintMode(true); setTimeout(() => { window.print(); setIsPrintMode(false); }, 300); };
@@ -515,25 +444,17 @@ export default function App() {
 
     if (!authReady || !currentUser) {
         return (
-            <LoginView
-                mode={authMode}
-                setMode={setAuthMode}
-                loginEmail={loginEmail}
-                setLoginEmail={setLoginEmail}
-                loginPhone={loginPhone}
-                setLoginPhone={setLoginPhone}
-                loginPw={loginPw}
-                setLoginPw={setLoginPw}
-                registerName={registerName}
-                setRegisterName={setRegisterName}
-                handleLogin={handleLogin}
-                handleOwnerLogin={handleOwnerLogin}
-                handleRegisterOwner={handleRegisterOwner}
-                academyInfo={academyInfo}
-                isSyncing={isSyncing || !authReady}
-                authBusy={authBusy}
-                needsOwnerSetup={needsOwnerSetup}
-            />
+            <div className="min-h-screen bg-[#f5f5f7] flex items-center justify-center font-sans p-6">
+                <div className="text-center">
+                    <div className="w-12 h-12 bg-[#0066cc] rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-sm">
+                        <Icon name="link" className="text-white text-lg" />
+                    </div>
+                    <p className="text-[14px] font-semibold text-[#1d1d1f]">Link Works 불러오는 중…</p>
+                    {bootError && (
+                        <p className="mt-3 text-[12px] text-[#86868b] max-w-sm mx-auto leading-relaxed">{bootError}</p>
+                    )}
+                </div>
+            </div>
         );
     }
 
@@ -549,12 +470,14 @@ export default function App() {
 
     return (
         <div className={"flex h-screen font-sans " + (isPrintMode ? 'print-mode bg-white' : 'bg-[#f5f5f7]')}>
-            {currentUser.mustChangePassword && (
-                <ForcePinChangeModal onSubmit={handleChangePin} busy={pinBusy} />
-            )}
             {!isSyncing && !isCloudActive && currentUser && (
                 <div className="absolute top-0 left-0 w-full bg-[#1d1d1f] text-[#f5f5f7] text-center py-2 text-[10px] font-bold no-print z-50 flex items-center justify-center gap-2 shadow-sm tracking-widest uppercase">
                     <i className="fas fa-database text-[#86868b]"></i> Running in Local Storage Mode
+                </div>
+            )}
+            {bootError && fbUser && (
+                <div className="absolute top-0 left-0 w-full bg-amber-500/90 text-white text-center py-2 text-[11px] font-semibold no-print z-50 px-4">
+                    클라우드 동기화 경고: {bootError}
                 </div>
             )}
             
@@ -590,14 +513,13 @@ export default function App() {
                 </nav>
 
                 <div className="p-5 border-t border-[rgba(0,0,0,0.05)]">
-                    <div className="flex items-center gap-3 mb-4 px-2">
+                    <div className="flex items-center gap-3 px-2">
                         <div className="w-9 h-9 rounded-full bg-white border border-[rgba(0,0,0,0.05)] flex items-center justify-center text-[#86868b] shadow-sm"><UserIcon size={14}/></div>
                         <div>
                             <p className="text-[13px] font-bold text-[#1d1d1f]">{currentUser.name}</p>
                             <p className="text-[10px] text-[#86868b] font-bold uppercase tracking-widest mt-0.5">{currentUser.role}</p>
                         </div>
                     </div>
-                    <button onClick={handleLogout} className="w-full text-[11px] py-2.5 bg-white hover:bg-[#e8e8ed] border border-[rgba(0,0,0,0.05)] text-[#1d1d1f] rounded-xl transition-colors font-bold uppercase tracking-widest shadow-sm">Sign Out</button>
                 </div>
             </aside>
 

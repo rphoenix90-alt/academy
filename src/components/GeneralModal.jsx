@@ -195,7 +195,8 @@ export const GeneralModal = ({
                             <div><label className={labelCls}>이메일 (선택)</label><input type="email" name="email" defaultValue={data?.email} placeholder="선택 입력" className={inputCls}/></div>
                             <div><label className={labelCls}>상태</label><select name="status" defaultValue={data?.status || '재직'} className={inputCls}><option>재직</option><option>휴직</option><option>퇴사</option></select></div>
                             <p className="text-[11px] text-[#86868b] font-medium leading-relaxed">
-                              원장을 제외한 직원은 전화번호로 로그인합니다. 최초 비밀번호는 전화번호 뒤 4자리이며, 첫 로그인 시 새 비밀번호(4자리)를 설정합니다.
+                              원장·관리자·강사 모두 전화번호로 로그인합니다. 최초 비밀번호는 전화번호 뒤 4자리이며, 첫 로그인 시 새 비밀번호(4자리)를 설정합니다.
+                              최초 관리자(이메일)는 「최고 관리자 로그인」을 사용합니다.
                               {data?.authUid ? ' (계정 연결됨)' : ' (아직 미연결)'}
                             </p>
                         </>}
